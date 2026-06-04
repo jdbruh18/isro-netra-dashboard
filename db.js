@@ -86,6 +86,7 @@ export async function initializeDb() {
       return;
     } catch (err) {
       console.warn("Failed to load @google-cloud/firestore. Falling back to local filesystem DB.", err);
+      useLocalDb = true;
     }
   }
 
