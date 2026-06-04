@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ISRO NETRA - Space Domain Awareness AI Dashboard</title>
+  <meta name="description" content="AI-Powered Space Domain Awareness and Gaganyaan Mission Trajectory Tracker - ISRO NETRA Control Center.">
+  <link rel="stylesheet" href="styles/main.css">
+  <link rel="stylesheet" href="styles/hud.css">
+</head>
+<body>
+  <!-- Cyber Scanline Effect -->
+  <div class="scan-line"></div>
+  <div class="grid-overlay"></div>
+
+  <div class="dashboard-container">
+    <!-- Header Area -->
+    <header class="hud-header">
+      <div class="logo-section">
+        <i data-lucide="radar" class="logo-icon text-cyan" style="width: 24px; height: 24px;"></i>
+        <h1>ISRO NETRA</h1>
+        <span class="logo-badge">SDA CENTER</span>
+      </div>
+
+      <div class="header-metrics">
+        <div class="metric-item">
+          <span class="metric-label">ISTRAC Downlink</span>
+          <span class="metric-value normal" id="lbl-downlink-status">SYNCHRONIZED</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Active Spacecraft</span>
+          <span class="metric-value" id="lbl-active-count">4</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Solar Index (Kp)</span>
+          <span class="metric-value normal" id="lbl-kp-index">3.2 Kp</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">System Epoch (UTC)</span>
+          <span class="metric-value" id="lbl-system-clock">00:00:00 UTC</span>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <button id="btn-sound-toggle" class="hud-btn" title="Toggle audio feedback">
+          <i data-lucide="volume-2" style="width: 14px; height: 14px;"></i>
+          <span>MUTE OFF</span>
+        </button>
+        <button id="btn-alarm-toggle" class="hud-btn danger" title="Toggle emergency alerts">
+          <i data-lucide="bell" style="width: 14px; height: 14px;"></i>
+          <span>ALARM OFF</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace Grid -->
+    <main class="hud-body">
+      
+      <!-- Left Panel: Space Asset List -->
+      <section class="hud-panel panel-operations" id="panel-assets">
+        <div class="panel-header">
+          <h2 class="panel-title">
+            <i data-lucide="satellite" style="width: 16px; height: 16px;"></i>
+            Space Assets
+          </h2>
+          <button class="panel-action" id="btn-fetch-live">Live TLE Update</button>
+        </div>
+        <div class="panel-content">
+          <div class="satellite-list" id="asset-list-container">
+            <!-- Satellite rows rendered dynamically -->
+          </div>
+          
+          <!-- Detailed Satellite Telemetry Overlay -->
+          <div class="sat-details-card" style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px;">
+            <div class="sat-details-title" id="sat-detail-name">Gaganyaan Crew Module</div>
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
+              <div class="sat-details-row">
+                <span class="sat-details-lbl">Altitude</span>
+                <span class="sat-details-val" id="sat-detail-alt">405.2 km</span>
+              </div>
+              <div class="sat-details-row">
+                <span class="sat-details-lbl">Velocity</span>
+                <span class="sat-details-val" id="sat-detail-vel">7.67 km/s</span>
+              </div>
+              <div class="sat-details-row">
+                <span class="sat-details-lbl">Latitude</span>
+                <span class="sat-details-val" id="sat-detail-lat">15.3421° N</span>
+              </div>
+              <div class="sat-details-row">
+                <span class="sat-details-lbl">Longitude</span>
+                <span class="sat-details-val" id="sat-detail-lng">75.8922° E</span>
+              </div>
+              <div class="sat-details-row">
+                <span class="sat-details-lbl">Mission Status</span>
+                <span class="sat-details-val normal" id="sat-detail-status">ORBIT OK</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Center Panel: 3D Orbital Canvas -->
+      <section class="hud-panel panel-orbits" id="panel-orbital-tracker">
+        <div class="panel-header">
+          <h2 class="panel-title">
+            <i data-lucide="globe" style="width: 16px; height: 16px;"></i>
+            3D Space Domain Map (SGP4 Propagation)
+          </h2>
+          <div style="font-family: var(--font-mono); font-size: 0.65rem; color: #64748b;">
+            Propagation: <span style="color: hsl(var(--color-cyan));" id="lbl-propagation-mode">satellite.js (SGP4)</span>
+          </div>
+        </div>
+        
+        <!-- Three.js Canvas Container -->
+        <div style="flex: 1; position: relative;">
+          <div id="three-container" style="width:100%; height:100%; position:absolute;"></div>
+          
+          <!-- Orbit View Control Buttons overlay -->
+          <div class="orbit-controls-hud">
+            <button id="btn-camera-reset" class="hud-btn">
+              <i data-lucide="refresh-cw" style="width: 12px; height: 12px;"></i>
+              Reset Camera
+            </button>
+            <button id="btn-orbit-path-toggle" class="hud-btn active">
+              <i data-lucide="eye" style="width: 12px; height: 12px;"></i>
+              Orbits On
+            </button>
+            <button id="btn-debris-toggle" class="hud-btn active danger">
+              <i data-lucide="shield-alert" style="width: 12px; height: 12px;"></i>
+              Debris On
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Panel: Space Weather & Conjunction Alerts -->
+      <section class="hud-panel panel-collision" id="panel-alerts-weather">
+        <div class="panel-header">
+          <h2 class="panel-title">
+            <i data-lucide="sun" style="width: 16px; height: 16px;"></i>
+            Solar Weather & Conjunctions
+          </h2>
+        </div>
+        <div class="panel-content">
+          <!-- Aditya-L1 Sensor Metrics -->
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <span class="metric-card-label">Aditya ASPEX</span>
+              <span class="metric-card-value" id="val-solar-wind">420 km/s</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-card-label">Aditya MAG (Z)</span>
+              <span class="metric-card-value" id="val-mag-flux">8.9 nT</span>
+            </div>
+          </div>
+          
+          <!-- Space Weather Canvas Graph -->
+          <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Aditya-L1 PAPA Proton Flux Chart</div>
+          <div class="weather-canvas-container">
+            <canvas id="weather-chart" style="width:100%; height:120px;"></canvas>
+          </div>
+          
+          <!-- Conjunction Risk Indicator -->
+          <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 15px; margin-bottom: 5px;">Conjunction Alert Matrix</div>
+          
+          <!-- Conjunction Warning Card -->
+          <div class="alert-card animate-pulse-red" id="card-conjunction-warning">
+            <div class="alert-card-header">
+              <span class="alert-card-title">CONJUNCTION COLLISION WARNING</span>
+              <i data-lucide="alert-triangle" style="width: 14px; height: 14px; color: hsl(var(--color-red));"></i>
+            </div>
+            <span class="alert-card-desc" id="lbl-conjunction-details">
+              Gaganyaan-1 approaching Cosmos-1408 Debris fragment. Distance: 254m. Velocity: 7.68 km/s.
+            </span>
+          </div>
+
+          <!-- AI Mitigation Burn Box -->
+          <div class="ai-suggestion-box">
+            <div class="ai-suggestion-title">AI Evacuation Solution</div>
+            <div class="ai-suggestion-body" id="lbl-ai-burn-solution">
+              Recommend: Delta-V 1.45 m/s | Radial-Out thrust.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bottom-Left Panel: Telemetry Console -->
+      <section class="hud-panel panel-terminal" id="panel-telemetry-console">
+        <div class="panel-header">
+          <h2 class="panel-title">
+            <i data-lucide="terminal" style="width: 16px; height: 16px;"></i>
+            ISTRAC Telemetry & Control Uplink
+          </h2>
+          <div style="font-family: var(--font-mono); font-size: 0.65rem; color: #64748b;">
+            Downlink Feed: <span style="color: hsl(var(--color-green));" id="lbl-ws-status">LOCAL OK</span>
+          </div>
+        </div>
+        <div class="panel-content">
+          <!-- Terminal output scroll box -->
+          <div class="terminal-screen" id="terminal-screen-container">
+            <!-- Logging lines rendered dynamically -->
+          </div>
+          
+          <!-- Input command field -->
+          <div class="terminal-input-row">
+            <input type="text" class="terminal-input-box" id="inp-terminal-command" placeholder="Enter ISTRAC telemetry command (e.g. '/diagnose', '/burn gaganyaan 1.25', '/clear_logs')..." />
+            <button id="btn-terminal-submit" class="hud-btn">UPLINK</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bottom-Right Panel: Gemini AI Agent -->
+      <section class="hud-panel panel-agent" id="panel-ai-operations">
+        <div class="panel-header">
+          <h2 class="panel-title ai">
+            <i data-lucide="sparkles" style="width: 16px; height: 16px; color: hsl(var(--color-purple));"></i>
+            Gemini Space AI Ops
+          </h2>
+        </div>
+        <div class="panel-content">
+          <!-- Gemini API Key configuration field -->
+          <div class="ai-key-input-row" id="container-api-key" style="margin-bottom: 8px;">
+            <i data-lucide="key" style="width: 12px; height: 12px; color: #64748b;"></i>
+            <input type="password" class="ai-key-input" id="inp-gemini-key" placeholder="Enter Gemini API Key for Live Agent loop..." />
+            <button id="btn-save-key" class="hud-btn" style="padding: 2px 8px; font-size: 0.6rem;">SAVE</button>
+          </div>
+
+          <div class="chat-history" id="chat-history-container">
+            <div class="chat-bubble ai">
+              <div class="chat-bubble-sender">
+                <i data-lucide="bot" style="width: 12px; height: 12px;"></i>
+                A.E.G.I.S. Space Intelligence
+              </div>
+              NETRA Autonomous Operations online. Ready to monitor ISRO telemetry and coordinate maneuvers. Ask me to diagnose satellites or execute collision shield protocols.
+            </div>
+          </div>
+          
+          <div class="terminal-input-row">
+            <input type="text" class="terminal-input-box" id="inp-chat-message" placeholder="Ask Gemini (e.g., 'Avoid collision')..." />
+            <button id="btn-chat-submit" class="hud-btn">SEND</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Floating Tool Execution Logs Overlay inside Gemini panel -->
+      <div style="display:none;" id="floating-agent-logs"></div>
+
+    </main>
+  </div>
+
+  <!-- CDN scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/satellite.js/4.0.0/satellite.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- App Script Entrypoint -->
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
