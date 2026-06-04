@@ -78,6 +78,7 @@ function parseUplinkCommand(command) {
       store.addLog('  /diagnose                      - Execute satellite sensor checks.', 'info');
       store.addLog('  /burn <satelliteId> <deltaV>   - Execute thruster burn to shift orbit (e.g. /burn gaganyaan 1.45).', 'info');
       store.addLog('  /weather                       - Pull data from Aditya-L1 solar probes.', 'info');
+      store.addLog('  /storm                         - Toggle simulated solar storm state.', 'info');
       store.addLog('  /clear                         - Clear console log lines.', 'info');
       break;
 
@@ -112,6 +113,32 @@ function parseUplinkCommand(command) {
         store.addLog('Aditya-L1 connection synchronized. Magnetic storm threat is ' + w.magneticStormLevel + '.', 'success');
         audio.playSuccess();
       }, 800);
+      break;
+
+    case '/storm':
+      const currentStorm = store.getState().spaceWeather;
+      const isStormActive = currentStorm.solarProtonFlux > 15.0;
+      if (isStormActive) {
+        currentStorm.solarProtonFlux = 12.5; // restore normal
+        currentStorm.kpIndex = 3.2;
+        currentStorm.magneticStormLevel = 'QUIET';
+        store.addLog('UPLINK: Resetting space weather to QUIET conditions.', 'success');
+      } else {
+        currentStorm.solarProtonFlux = 55.0; // activate storm!
+        currentStorm.kpIndex = 6.5;
+        currentStorm.magneticStormLevel = 'SEVERE STORM';
+        store.addLog('WARNING: Severe solar storm simulated. Proton flux exceeds 50 pfu!', 'danger');
+      }
+      store.updateState('spaceWeather', { ...currentStorm });
+      
+      // Dispatch event to forward this to server over WebSocket
+      document.dispatchEvent(new CustomEvent('uplink-weather', {
+        detail: {
+          solarProtonFlux: currentStorm.solarProtonFlux,
+          kpIndex: currentStorm.kpIndex,
+          magneticStormLevel: currentStorm.magneticStormLevel
+        }
+      }));
       break;
 
     case '/burn':

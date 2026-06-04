@@ -129,6 +129,14 @@ wss.on('connection', (ws) => {
       if (packet.action === "MANEUVER_ORBIT") {
         const { satelliteId, deltaV, direction } = packet;
         await executeManeuver(satelliteId, deltaV, direction, "External Agent Command");
+      } else if (packet.action === "UPDATE_WEATHER") {
+        const { solarProtonFlux, kpIndex, magneticStormLevel } = packet;
+        serverTelemetry.spaceWeather.solarProtonFlux = parseFloat(solarProtonFlux);
+        if (kpIndex !== undefined) serverTelemetry.spaceWeather.kpIndex = parseFloat(kpIndex);
+        if (magneticStormLevel !== undefined) serverTelemetry.spaceWeather.magneticStormLevel = magneticStormLevel;
+        
+        // Broadcast telemetry update across all clients
+        broadcastTelemetry("TELEMETRY_CLOCK_TICK", serverTelemetry);
       }
     } catch (e) {
       console.error("Invalid WebSocket command received:", e);
@@ -367,6 +375,17 @@ app.post('/api/gemini', async (req, res) => {
             description: "Retrieve Aditya-L1 solar observatory sensor telemetry: Kp-index, solar flux, magnetometer (magX/Y/Z) readings, and storm levels."
           },
           {
+            name: "consult_solar_physics_analyst",
+            description: "Consult the Aditya Solar Physics Analyst before executing any orbital burn to confirm space weather safety and obtain clearance.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                satelliteId: { type: "STRING", description: "Unique ID of the satellite undergoing maneuver (e.g. 'gaganyaan')." }
+              },
+              required: ["satelliteId"]
+            }
+          },
+          {
             name: "calculate_avoidance_vector",
             description: "Computes the exact delta-v (m/s) thrust and burn direction (PROGRADE, RETROGRADE) required to steer a satellite away from a collision danger corridor.",
             parameters: {
@@ -403,8 +422,10 @@ You monitor Indian satellites (including Gaganyaan-1, Cartosat-3, NavIC constell
 When the user asks you questions or requests checks:
 1. First, query 'get_satellite_states' to review coordinates and danger flags.
 2. If any satellite has a threat level of 'WARNING' or 'DANGER', immediately run 'calculate_avoidance_vector' to get orbital thrust metrics.
-3. Then, call 'execute_orbital_burn' to maneuver the satellite and save the vehicle.
-4. Report your actions step-by-step, including the delta-v values and altitude shifts.
+3. Before calling 'execute_orbital_burn' to execute a burn, you MUST consult the Aditya Solar Physics Analyst using the 'consult_solar_physics_analyst' tool to check space weather safety.
+4. If the Analyst reports status 'ABORT', you MUST abort the maneuver. Explain the Aditya-L1 solar storm / ESD radiation hazard details to the operator and do NOT call 'execute_orbital_burn'.
+5. If the Analyst reports status 'CLEAR', proceed with calling 'execute_orbital_burn' to execute the maneuver.
+6. Report your actions step-by-step, including the delta-v values, the Analyst weather consensus dialog, and altitude shifts.
 Format your final response in clear, concise markdown with appropriate headers. Keep it professional and military-grade.`
     });
 
@@ -435,6 +456,62 @@ Format your final response in clear, concise markdown with appropriate headers. 
           toolResult = { satellites: serverTelemetry.satellites };
         } else if (name === "get_space_weather") {
           toolResult = { spaceWeather: serverTelemetry.spaceWeather };
+        } else if (name === "consult_solar_physics_analyst") {
+          const weather = serverTelemetry.spaceWeather;
+          let analystResult = null;
+          
+          try {
+            // Secondary agent invocation
+            const analystAi = new GoogleGenerativeAI(apiKey);
+            const analystModel = analystAi.getGenerativeModel({ model: "gemini-1.5-flash" });
+            const prompt = `You are the Aditya Solar Physics Analyst at ISRO.
+Review the following solar weather data from the Aditya-L1 observatory:
+- Kp Index: ${weather.kpIndex}
+- Solar Wind Speed: ${weather.solarWindSpeed} km/s
+- Solar Proton Flux: ${weather.solarProtonFlux} pfu
+- Magnetic Storm Level: ${weather.magneticStormLevel}
+
+Determine if it is safe to execute an orbital maneuver.
+Criteria: If Solar Proton Flux is > 15.0 pfu or Kp Index >= 4.5, you MUST recommend AGAINST orbital maneuvers due to high risk of thruster electrostatic discharge (ESD) and telemetry scintillation/blackout.
+Otherwise, recommend proceeding.
+Return your response strictly in the following JSON format:
+{
+  "status": "CLEAR" or "ABORT",
+  "reasoning": "Scientific reasoning regarding radiation levels and thruster risks",
+  "recommendation": "Operational recommendation statement"
+}`;
+            const apiRes = await analystModel.generateContent({
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+              generationConfig: { responseMimeType: "application/json" }
+            });
+            const textResponse = apiRes.response.text();
+            analystResult = JSON.parse(textResponse);
+          } catch (apiErr) {
+            console.warn("Secondary Aditya agent API call failed, falling back to rule-based evaluation:", apiErr);
+          }
+
+          // Fallback rule if API call failed or returned malformed json
+          if (!analystResult || !analystResult.status) {
+            const isStorm = weather.solarProtonFlux > 15.0 || weather.kpIndex >= 4.5;
+            analystResult = {
+              status: isStorm ? "ABORT" : "CLEAR",
+              reasoning: isStorm
+                ? `Proton flux (${weather.solarProtonFlux.toFixed(1)} pfu) or Kp index (${weather.kpIndex.toFixed(1)}) is above safety thresholds. Ionizing radiation hazard and communication interference active.`
+                : `Proton flux (${weather.solarProtonFlux.toFixed(1)} pfu) is stable. Space weather environment clear.`,
+              recommendation: isStorm
+                ? "ABORT burn sequence. Defer orbital corrections and initiate spacecraft electrostatic shielding."
+                : "Proceed with maneuver. Systems clear."
+            };
+          }
+
+          toolResult = {
+            satelliteId: args.satelliteId,
+            status: analystResult.status,
+            reasoning: analystResult.reasoning,
+            recommendation: analystResult.recommendation,
+            solarProtonFlux: weather.solarProtonFlux,
+            kpIndex: weather.kpIndex
+          };
         } else if (name === "calculate_avoidance_vector") {
           const satId = args.satelliteId;
           const isLeo = satId === 'gaganyaan' || satId === 'cosmos-debris';

@@ -132,6 +132,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       }));
     }
   });
+
+  // Listen for simulated weather overrides and forward to server
+  document.addEventListener('uplink-weather', (e) => {
+    const { solarProtonFlux, kpIndex, magneticStormLevel } = e.detail;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        action: "UPDATE_WEATHER",
+        solarProtonFlux,
+        kpIndex,
+        magneticStormLevel
+      }));
+    }
+  });
 });
 
 // Setup WebSocket Connection with automatic reconnection and fallback
