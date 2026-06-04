@@ -164,6 +164,12 @@
   box-shadow: var(--glow-cyan);
 }
 
+.panel-action.active {
+  background: hsl(var(--color-cyan), 0.25);
+  border-color: hsl(var(--color-cyan));
+  box-shadow: var(--glow-cyan);
+}
+
 /* Panel Content Container */
 .panel-content {
   padding: 16px;

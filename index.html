@@ -63,9 +63,26 @@
             <i data-lucide="satellite" style="width: 16px; height: 16px;"></i>
             Space Assets
           </h2>
-          <button class="panel-action" id="btn-fetch-live">Live TLE Update</button>
+          <span style="font-family: var(--font-mono); font-size: 0.65rem; color: #64748b;">
+            Tracked: <span style="color: hsl(var(--color-cyan));" id="lbl-asset-count">0</span>
+          </span>
         </div>
         <div class="panel-content">
+          <!-- Catalog Search Input -->
+          <div class="search-container" style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <input type="text" id="inp-catalog-search" class="terminal-input-box" placeholder="NORAD ID or Name..." style="padding: 6px 10px; font-size: 0.75rem; margin-top: 0;" />
+            <button id="btn-catalog-search" class="hud-btn" style="padding: 6px 10px; flex-shrink: 0;">TRACK</button>
+          </div>
+
+          <!-- Category Filters Tabs -->
+          <div class="category-tabs" style="display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px; overflow-x: auto; flex-shrink: 0;">
+            <button class="panel-action active" id="tab-cat-all" data-category="all" style="font-size: 0.6rem; padding: 2px 4px;">ALL</button>
+            <button class="panel-action" id="tab-cat-indian" data-category="indian" style="font-size: 0.6rem; padding: 2px 4px;">INDIAN</button>
+            <button class="panel-action" id="tab-cat-active" data-category="active" style="font-size: 0.6rem; padding: 2px 4px;">ACTIVE</button>
+            <button class="panel-action" id="tab-cat-debris" data-category="debris" style="font-size: 0.6rem; padding: 2px 4px;">DEBRIS</button>
+            <button class="panel-action" id="tab-cat-starlink" data-category="starlink" style="font-size: 0.6rem; padding: 2px 4px;">STARLINK</button>
+          </div>
+
           <div class="satellite-list" id="asset-list-container">
             <!-- Satellite rows rendered dynamically -->
           </div>

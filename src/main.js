@@ -88,6 +88,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   initCollisionMonitor();
   initAgentConsole(socket, useWebsocket);
 
+  // 7.5. Bind Search and Filter Events
+  bindSearchAndFilterEvents();
+
   // 8. Start local simulation clock loop
   // If WebSocket is active, SGP4 tick updates coordinates from the server.
   // If offline, the local SGP4 clock propagates satellite orbits in the client directly.
@@ -144,38 +147,46 @@ function setupWebsocketConnection() {
     socket.onmessage = (event) => {
       const packet = JSON.parse(event.data);
       
-      if (packet.type === "TELEMETRY_CLOCK_TICK") {
+      if (packet.type === "TELEMETRY_CLOCK_TICK" || packet.type === "TELEMETRY_INITIAL_STATE") {
         // Sync state from server
         const currentLocal = store.getState().satellites;
+        const serverSats = packet.data.satellites || [];
         
-        // Merge coordinate positions keeping frontend metadata (like user selections)
-        const merged = currentLocal.map(localSat => {
-          const serverSat = packet.data.satellites.find(s => s.id === localSat.id);
-          if (serverSat) {
+        // Merge coordinate positions keeping frontend metadata (like user selections & burns)
+        const merged = serverSats.map((serverSat, idx) => {
+          const localSat = currentLocal.find(s => s.id === serverSat.id);
+          if (localSat) {
             localSat.lat = serverSat.lat;
             localSat.lng = serverSat.lng;
             localSat.alt = serverSat.alt;
             localSat.velocity = serverSat.velocity;
             localSat.threatLevel = serverSat.threatLevel;
             localSat.threatDetails = serverSat.threatDetails;
+            localSat.category = serverSat.category || localSat.category;
             
             // Re-propagate 3D Cartesian coordinates for ThreeJS
             const offset = localSat.burnAdjustments ? localSat.burnAdjustments.alt : 0;
-            const idx = currentLocal.indexOf(localSat);
             const res = propagateSatellite(localSat.tle1, localSat.tle2, store.getState().simTime, offset, idx);
             localSat.position3d = res.position3d;
+            return localSat;
+          } else {
+            // New satellite added dynamically, propagate initial coordinates
+            const res = propagateSatellite(serverSat.tle1, serverSat.tle2, store.getState().simTime, 0, idx);
+            serverSat.position3d = res.position3d;
+            return serverSat;
           }
-          return localSat;
         });
 
         store.updateState('satellites', merged);
         updateSatPositions3D(merged);
 
         // Update solar wind variables from server
-        const weather = store.getState().spaceWeather;
-        weather.solarWindSpeed = packet.data.spaceWeather.solarWindSpeed;
-        weather.solarProtonFlux = packet.data.spaceWeather.solarProtonFlux;
-        store.updateState('spaceWeather', weather);
+        if (packet.data.spaceWeather) {
+          const weather = store.getState().spaceWeather;
+          weather.solarWindSpeed = packet.data.spaceWeather.solarWindSpeed;
+          weather.solarProtonFlux = packet.data.spaceWeather.solarProtonFlux;
+          store.updateState('spaceWeather', weather);
+        }
       } 
       
       else if (packet.type === "ORBIT_MODIFIED") {
@@ -221,4 +232,103 @@ function handleConnectionFailure() {
   socket = null;
   document.getElementById('lbl-ws-status').textContent = 'LOCAL STANDALONE';
   document.getElementById('lbl-ws-status').className = 'metric-value warning';
+}
+
+function bindSearchAndFilterEvents() {
+  // 1. Category Tabs click handler
+  const tabs = document.querySelectorAll('.category-tabs .panel-action');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      const category = tab.getAttribute('data-category') || 'all';
+      store.updateState('activeCategory', category);
+      audio.playClick();
+      store.addLog(`Switched telemetry display filter to category: [${category.toUpperCase()}]`, 'info');
+    });
+  });
+
+  // 2. Search Box track query handler
+  const searchInput = document.getElementById('inp-catalog-search');
+  const searchBtn = document.getElementById('btn-catalog-search');
+
+  if (!searchInput || !searchBtn) return;
+
+  const triggerCatalogSearch = async () => {
+    const query = searchInput.value.trim();
+    if (!query) return;
+
+    audio.playClick();
+    store.addLog(`Querying space catalog database proxy for query: "${query}"...`, 'info');
+
+    if (!useWebsocket) {
+      store.addLog('[ERROR] Dynamic catalog updates require active backend WebSocket telemetry link.', 'danger');
+      audio.playHover();
+      return;
+    }
+
+    try {
+      searchBtn.disabled = true;
+      searchInput.disabled = true;
+
+      // Call express proxy endpoint
+      const response = await fetch(`/api/catalog/search?query=${encodeURIComponent(query)}`);
+      if (!response.ok) {
+        throw new Error(`Catalog proxy search query failed with status: ${response.status}`);
+      }
+
+      const results = await response.json();
+      if (!results || results.length === 0) {
+        store.addLog(`No matching active satellites or debris entries found for query: "${query}"`, 'danger');
+        audio.playHover();
+        return;
+      }
+
+      // Add the first matching satellite
+      const match = results[0];
+      store.addLog(`Found target match: ${match.OBJECT_NAME.trim()} (NORAD ID: ${match.NORAD_CAT_ID}). Synchronizing orbital elements...`, 'warning');
+
+      const addResponse = await fetch('/api/catalog/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noradId: match.NORAD_CAT_ID })
+      });
+
+      if (!addResponse.ok) {
+        const errData = await addResponse.json();
+        throw new Error(errData.error || 'Failed to add satellite elements.');
+      }
+
+      const newSat = await addResponse.json();
+
+      // Check if it's already in the client-side state
+      const currentSats = store.getState().satellites;
+      const exists = currentSats.some(s => s.id === newSat.id);
+      if (!exists) {
+        store.updateState('satellites', [...currentSats, newSat]);
+      }
+
+      // Automatically focus details on the newly added spacecraft
+      store.updateState('activeSatelliteId', newSat.id);
+
+      store.addLog(`Uplink successful: Tracking target ${newSat.name} in orbit.`, 'success');
+      audio.playSuccess();
+      searchInput.value = '';
+    } catch (err) {
+      console.error(err);
+      store.addLog(`Satellite sync failure: ${err.message}`, 'danger');
+      audio.playHover();
+    } finally {
+      searchBtn.disabled = false;
+      searchInput.disabled = false;
+    }
+  };
+
+  searchBtn.addEventListener('click', triggerCatalogSearch);
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      triggerCatalogSearch();
+    }
+  });
 }

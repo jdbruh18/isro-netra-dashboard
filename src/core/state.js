@@ -8,6 +8,8 @@ class StateStore {
     this.state = {
       satellites: [],
       activeSatelliteId: 'gaganyaan',
+      activeCategory: 'all',
+      searchQuery: '',
       spaceWeather: {
         kpIndex: 3.2,
         solarWindSpeed: 420, // km/s

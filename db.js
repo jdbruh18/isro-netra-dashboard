@@ -23,7 +23,8 @@ const DEFAULT_SATELLITES = [
     threatLevel: "NORMAL",
     threatDetails: "Normal orbital operations.",
     tle1: "1 99901U 26001A   26155.50000000  .00020000  00000-0  10000-3 0  9991",
-    tle2: "2 99901  51.6400 120.5000 0005000  30.0000 330.0000 15.60000000    12"
+    tle2: "2 99901  51.6400 120.5000 0005000  30.0000 330.0000 15.60000000    12",
+    category: "indian"
   },
   {
     id: "cosmos-debris",
@@ -37,7 +38,8 @@ const DEFAULT_SATELLITES = [
     threatLevel: "WARNING",
     threatDetails: "Intersection route with Gaganyaan capsule.",
     tle1: "1 99902U 21000A   26155.49900000  .00030000  00000-0  20000-3 0  9995",
-    tle2: "2 99902  51.6420 120.4850 0005200  28.0000 332.0000 15.60150000    16"
+    tle2: "2 99902  51.6420 120.4850 0005200  28.0000 332.0000 15.60150000    16",
+    category: "debris"
   },
   {
     id: "cartosat-3",
@@ -51,7 +53,8 @@ const DEFAULT_SATELLITES = [
     threatLevel: "NORMAL",
     threatDetails: "Imaging payload operational.",
     tle1: "1 44804U 19081A   26155.50000000  .00001000  00000-0  50000-4 0  9992",
-    tle2: "2 44804  97.4000 230.1200 0012000  90.0000 270.0000 15.20000000    13"
+    tle2: "2 44804  97.4000 230.1200 0012000  90.0000 270.0000 15.20000000    13",
+    category: "indian"
   },
   {
     id: "navic-1i",
@@ -65,7 +68,8 @@ const DEFAULT_SATELLITES = [
     threatLevel: "NORMAL",
     threatDetails: "NavIC atomic clock synchronization stable.",
     tle1: "1 43286U 18035A   26155.50000000  .00000100  00000-0  00000-0 0  9993",
-    tle2: "2 43286  29.0000  80.2000 0020000 180.0000 180.0000  1.00270000    14"
+    tle2: "2 43286  29.0000  80.2000 0020000 180.0000 180.0000  1.00270000    14",
+    category: "indian"
   }
 ];
 
@@ -106,10 +110,14 @@ export async function initializeDb() {
 function readLocalJson() {
   try {
     const raw = fs.readFileSync(LOCAL_DB_PATH, 'utf-8');
-    return JSON.parse(raw);
+    const data = JSON.parse(raw || '{}');
+    if (!data.satellites) data.satellites = [...DEFAULT_SATELLITES];
+    if (!data.telemetryLogs) data.telemetryLogs = [];
+    if (!data.agentActions) data.agentActions = [];
+    return data;
   } catch (e) {
     console.error("Failed to read local JSON database, returning empty schema.", e);
-    return { satellites: DEFAULT_SATELLITES, telemetryLogs: [], agentActions: [] };
+    return { satellites: [...DEFAULT_SATELLITES], telemetryLogs: [], agentActions: [] };
   }
 }
 

@@ -192,6 +192,123 @@ app.get('/api/telemetry', (req, res) => {
   res.json(serverTelemetry);
 });
 
+// REST Endpoint: Proxy Search query to CelesTrak to prevent client CORS blocks
+app.get('/api/catalog/search', async (req, res) => {
+  const { query } = req.query;
+  if (!query) {
+    return res.status(400).json({ error: "Missing search query parameter." });
+  }
+
+  try {
+    let celestrakUrl = '';
+    const isNoradId = /^\d+$/.test(query);
+
+    if (isNoradId) {
+      celestrakUrl = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${query}&FORMAT=json`;
+    } else {
+      celestrakUrl = `https://celestrak.org/NORAD/elements/gp.php?NAME=${encodeURIComponent(query)}&FORMAT=json`;
+    }
+
+    const response = await fetch(celestrakUrl);
+    if (!response.ok) {
+      return res.status(response.status).json({ error: "Failed to fetch from NORAD catalog database." });
+    }
+
+    const data = await response.json();
+    res.json(data || []);
+  } catch (err) {
+    console.error("CelesTrak search error:", err);
+    res.status(500).json({ error: "Failed to connect to NORAD server: " + err.message });
+  }
+});
+
+// REST Endpoint: Add a new satellite TLE dynamically to active tracking
+app.post('/api/catalog/add', async (req, res) => {
+  const { noradId, category } = req.body;
+  if (!noradId) {
+    return res.status(400).json({ error: "Missing noradId in request body." });
+  }
+
+  try {
+    const celestrakUrl = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${noradId}&FORMAT=json`;
+    const response = await fetch(celestrakUrl);
+    
+    if (!response.ok) {
+      return res.status(response.status).json({ error: "Failed to retrieve TLE from NORAD database." });
+    }
+
+    const data = await response.json();
+    if (data && data.length > 0) {
+      const item = data[0];
+      
+      // Parse Keplerian GP format back to standard TLE representation
+      const line1 = `1 ${item.NORAD_CAT_ID.toString().padStart(5,'0')}U ${item.COSPAR_ID || '26001A'}   ${item.EPOCH.substring(2,4)}${item.EPOCH.substring(5,7)}${item.EPOCH.substring(8,10)}.00000000  .00000000  00000-0  00000-0 0  9997`;
+      
+      // Formats Keplerian orbits parameters
+      const incl = item.INCLINATION.toFixed(4).padStart(8);
+      const raan = item.RA_OF_ASC_NODE.toFixed(4).padStart(8);
+      const ecc = (item.ECCENTRICITY * 10000000).toFixed(0).padStart(7, '0');
+      const arg = item.ARG_OF_PERICENTER.toFixed(4).padStart(8);
+      const mean = item.MEAN_ANOMALY.toFixed(4).padStart(8);
+      const motion = item.MEAN_MOTION.toFixed(8).padStart(11);
+      
+      const line2 = `2 ${item.NORAD_CAT_ID.toString().padStart(5,'0')}  ${incl} ${raan} ${ecc} ${arg} ${mean} ${motion}`;
+
+      // Set owner based on name signatures
+      let owner = "OTHER";
+      if (item.OBJECT_NAME.includes("STARLINK")) owner = "SPACEX";
+      else if (item.OBJECT_NAME.includes("ONEWEB")) owner = "ONEWEB";
+      else if (item.OBJECT_NAME.includes("ISS") || item.OBJECT_NAME.includes("ZARYA")) owner = "NASA/ROSCOSMOS";
+      else if (item.OBJECT_NAME.includes("CARTOSAT") || item.OBJECT_NAME.includes("IRNSS") || item.OBJECT_NAME.includes("EOS")) owner = "ISRO";
+
+      // Detect visual categories
+      let cat = category || "active";
+      if (item.OBJECT_NAME.includes("STARLINK")) cat = "starlink";
+      else if (item.OBJECT_NAME.includes("DEBRIS") || item.OBJECT_NAME.includes("DEB")) cat = "debris";
+      else if (owner === "ISRO") cat = "indian";
+
+      const newSat = {
+        id: `sat-${item.NORAD_CAT_ID}`,
+        name: item.OBJECT_NAME.trim(),
+        owner: owner,
+        type: item.OBJECT_TYPE || "SATELLITE",
+        tle1: line1,
+        tle2: line2,
+        altOffset: 0,
+        status: "active",
+        threatLevel: "NORMAL",
+        threatDetails: "Telemetry synchronized.",
+        category: cat
+      };
+
+      // Save to Database persistence layer
+      await saveSatellite(newSat);
+      await saveLog({
+        timestamp: new Date().toLocaleTimeString(),
+        text: `[UPLINK] Added space asset ${newSat.name} (NORAD ID: ${item.NORAD_CAT_ID}) to catalog.`,
+        type: "success"
+      });
+
+      // Synchronize in-memory telemetry state
+      const existsIdx = serverTelemetry.satellites.findIndex(s => s.id === newSat.id);
+      if (existsIdx !== -1) {
+        serverTelemetry.satellites[existsIdx] = newSat;
+      } else {
+        serverTelemetry.satellites.push(newSat);
+      }
+
+      // Broadcast changes to active listeners
+      broadcastTelemetry("TELEMETRY_CLOCK_TICK", serverTelemetry);
+      res.json(newSat);
+    } else {
+      res.status(404).json({ error: "Satellite ID not found in NORAD catalog." });
+    }
+  } catch (err) {
+    console.error("Failed to add satellite to catalog:", err);
+    res.status(500).json({ error: "Failed to link satellite: " + err.message });
+  }
+});
+
 // REST Endpoint: Gemini AI Agent Gateway with Function Calling (Tools)
 app.post('/api/gemini', async (req, res) => {
   // Use env key or client header key for ultimate flexibility (hybrid local/cloud mode)

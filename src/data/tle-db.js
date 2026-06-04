@@ -15,7 +15,8 @@ export const ISRO_TLE_CATALOG = [
     tle2: "2 99901  51.6400 120.5000 0005000  30.0000 330.0000 15.60000000    12",
     altOffset: 0,
     status: "active",
-    threatLevel: "NORMAL"
+    threatLevel: "NORMAL",
+    category: "indian"
   },
   {
     id: "cosmos-debris",
@@ -26,7 +27,8 @@ export const ISRO_TLE_CATALOG = [
     tle2: "2 99902  51.6420 120.4850 0005200  28.0000 332.0000 15.60150000    16",
     altOffset: 0,
     status: "active",
-    threatLevel: "WARNING"
+    threatLevel: "WARNING",
+    category: "debris"
   },
   {
     id: "cartosat-3",
@@ -37,7 +39,8 @@ export const ISRO_TLE_CATALOG = [
     tle2: "2 44804  97.4000 230.1200 0012000  90.0000 270.0000 15.20000000    13",
     altOffset: 0.15,
     status: "active",
-    threatLevel: "NORMAL"
+    threatLevel: "NORMAL",
+    category: "indian"
   },
   {
     id: "navic-1i",
@@ -48,7 +51,8 @@ export const ISRO_TLE_CATALOG = [
     tle2: "2 43286  29.0000  80.2000 0020000 180.0000 180.0000  1.00270000    14",
     altOffset: 0,
     status: "active",
-    threatLevel: "NORMAL"
+    threatLevel: "NORMAL",
+    category: "indian"
   },
   {
     id: "navic-1g",
@@ -59,7 +63,8 @@ export const ISRO_TLE_CATALOG = [
     tle2: "2 41469   0.1000  55.4000 0001000 220.0000 140.0000  1.00270000    15",
     altOffset: 0,
     status: "active",
-    threatLevel: "NORMAL"
+    threatLevel: "NORMAL",
+    category: "indian"
   }
 ];
 

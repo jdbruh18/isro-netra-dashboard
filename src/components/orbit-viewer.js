@@ -141,10 +141,7 @@ export function initOrbitViewer() {
   btnOrbitToggle.addEventListener('click', () => {
     isOrbitPathVisible = !isOrbitPathVisible;
     btnOrbitToggle.classList.toggle('active', isOrbitPathVisible);
-    
-    orbitLinesMap.forEach((line) => {
-      line.visible = isOrbitPathVisible;
-    });
+    updateVisibilities();
     audio.playClick();
   });
 
@@ -152,19 +149,21 @@ export function initOrbitViewer() {
   btnDebrisToggle.addEventListener('click', () => {
     isDebrisVisible = !isDebrisVisible;
     btnDebrisToggle.classList.toggle('active', isDebrisVisible);
-    
-    const debrisSat = satObjectsMap.get('cosmos-debris');
-    const debrisLine = orbitLinesMap.get('cosmos-debris');
-    if (debrisSat) debrisSat.visible = isDebrisVisible;
-    if (debrisLine) debrisLine.visible = isDebrisVisible && isOrbitPathVisible;
-    if (conjunctionLine) conjunctionLine.visible = isDebrisVisible;
-    
+    updateVisibilities();
     audio.playClick();
   });
 
   // 8. Subscribe to Satellites state for detail cards clicking & updates
   store.subscribe('satellites', (sats) => {
     renderSatelliteGeometries(sats);
+  });
+
+  store.subscribe('activeCategory', () => {
+    updateVisibilities();
+  });
+
+  store.subscribe('searchQuery', () => {
+    updateVisibilities();
   });
 
   // 9. Resize Handling
@@ -180,11 +179,71 @@ export function initOrbitViewer() {
   animate();
 }
 
+export function updateVisibilities(sats) {
+  const currentSats = sats || store.getState().satellites;
+  const { activeCategory, searchQuery } = store.getState();
+
+  currentSats.forEach((s) => {
+    const mesh = satObjectsMap.get(s.id);
+    const line = orbitLinesMap.get(s.id);
+
+    if (!mesh && !line) return;
+
+    // Check category filter
+    let visibleByFilter = true;
+    if (activeCategory !== 'all' && s.category !== activeCategory) {
+      visibleByFilter = false;
+    }
+
+    // Check search query filter
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const nameMatch = s.name && s.name.toLowerCase().includes(q);
+      const idMatch = s.id && s.id.toLowerCase().includes(q);
+      const noradMatch = s.tle2 && s.tle2.substring(2, 7).includes(q);
+      if (!nameMatch && !idMatch && !noradMatch) visibleByFilter = false;
+    }
+
+    // Check debris toggle (if category debris or type debris)
+    let visibleByDebris = true;
+    if (s.category === 'debris' || s.type === 'Space Debris' || s.id === 'cosmos-debris') {
+      if (!isDebrisVisible) visibleByDebris = false;
+    }
+
+    if (mesh) {
+      mesh.visible = visibleByFilter && visibleByDebris;
+    }
+    if (line) {
+      line.visible = visibleByFilter && visibleByDebris && isOrbitPathVisible;
+    }
+  });
+
+  if (conjunctionLine) {
+    conjunctionLine.visible = isDebrisVisible;
+  }
+}
+
 function renderSatelliteGeometries(sats) {
   if (!scene) return;
 
+  // 1. Clean up deleted satellites
+  const satIds = new Set(sats.map(s => s.id));
+  satObjectsMap.forEach((mesh, id) => {
+    if (!satIds.has(id)) {
+      earthGroup.remove(mesh);
+      satObjectsMap.delete(id);
+    }
+  });
+  orbitLinesMap.forEach((line, id) => {
+    if (!satIds.has(id)) {
+      earthGroup.remove(line);
+      orbitLinesMap.delete(id);
+    }
+  });
+
+  // 2. Create meshes and paths
   sats.forEach((s) => {
-    // 1. Create orbit paths if not exists
+    // Create orbit paths if not exists
     if (!orbitLinesMap.has(s.id)) {
       const orbitGeo = new THREE.BufferGeometry();
       const points = [];
@@ -196,33 +255,49 @@ function renderSatelliteGeometries(sats) {
       const scale = 5 / earthRadius;
       const r = orbitRadius * scale;
 
-      // Spacing and inclination
-      const inclination = (s.id === 'navic-1i' || s.id === 'navic-1g') 
-        ? (29 * Math.PI / 180) 
-        : (51.6 * Math.PI / 180);
+      // Extract orbital inclination and RAAN from TLE if available
+      let inclinationRad = 51.6 * Math.PI / 180;
+      let raanRad = 0;
+      if (s.tle2) {
+        const inclStr = s.tle2.substring(8, 16).trim();
+        const inclVal = parseFloat(inclStr);
+        if (!isNaN(inclVal)) inclinationRad = inclVal * Math.PI / 180;
+
+        const raanStr = s.tle2.substring(17, 25).trim();
+        const raanVal = parseFloat(raanStr);
+        if (!isNaN(raanVal)) raanRad = raanVal * Math.PI / 180;
+      } else {
+        // Fallback for defaults without TLE representation
+        inclinationRad = (s.id === 'navic-1i' || s.id === 'navic-1g') 
+          ? (29 * Math.PI / 180) 
+          : (51.6 * Math.PI / 180);
+      }
       
       for (let i = 0; i <= segments; i++) {
         const theta = (i / segments) * Math.PI * 2;
-        const x = r * Math.cos(theta);
-        const y = r * Math.sin(theta);
+        const x_o = r * Math.cos(theta);
+        const y_o = r * Math.sin(theta);
         
-        // Inclined orbital plane projection
-        const px = x;
-        const py = y * Math.cos(inclination);
-        const pz = y * Math.sin(inclination);
+        // ECI coordinates transformation tilted by inclination and RAAN
+        const px = x_o * Math.cos(raanRad) - y_o * Math.sin(raanRad) * Math.cos(inclinationRad);
+        const py = x_o * Math.sin(raanRad) + y_o * Math.cos(raanRad) * Math.cos(inclinationRad);
+        const pz = y_o * Math.sin(inclinationRad);
         
         points.push(new THREE.Vector3(px, py, pz));
       }
 
       orbitGeo.setFromPoints(points);
       
-      // Styles paths depending on type
+      // Style paths based on category/type
       let color = 0x00f0ff;
       let opacity = 0.25;
-      if (s.type === 'Space Debris') {
+      if (s.category === 'debris' || s.type === 'Space Debris' || s.id === 'cosmos-debris') {
         color = 0xff003c;
         opacity = 0.15;
-      } else if (s.type === 'Regional Navigation') {
+      } else if (s.category === 'starlink') {
+        color = 0xbc00dd;
+        opacity = 0.25;
+      } else if (s.category === 'indian' || s.type === 'Regional Navigation') {
         color = 0xffb700;
         opacity = 0.2;
       }
@@ -234,29 +309,25 @@ function renderSatelliteGeometries(sats) {
       });
 
       const line = new THREE.Line(orbitGeo, orbitMat);
-      line.visible = isOrbitPathVisible;
-      
-      // Hide debris elements if toggled off
-      if (s.id === 'cosmos-debris' && !isDebrisVisible) {
-        line.visible = false;
-      }
-
       earthGroup.add(line);
       orbitLinesMap.set(s.id, line);
     }
 
-    // 2. Create satellite visual meshes if not exists
+    // Create satellite visual meshes if not exists
     if (!satObjectsMap.has(s.id)) {
-      let color = 0x00f0ff; // Normal
+      let color = 0x00f0ff;
       let size = 0.15;
       
       if (s.id === 'gaganyaan') {
-        size = 0.22; // Make Gaganyaan distinct
+        size = 0.22;
         color = 0x00f0ff;
-      } else if (s.type === 'Space Debris') {
+      } else if (s.category === 'debris' || s.type === 'Space Debris') {
         color = 0xff003c;
         size = 0.12;
-      } else if (s.type === 'Regional Navigation') {
+      } else if (s.category === 'starlink') {
+        color = 0xbc00dd;
+        size = 0.13;
+      } else if (s.category === 'indian') {
         color = 0xffb700;
         size = 0.16;
       }
@@ -267,16 +338,14 @@ function renderSatelliteGeometries(sats) {
         wireframe: false
       });
       const satMesh = new THREE.Mesh(satGeo, satMat);
-      
-      // Hide debris mesh if toggled off
-      if (s.id === 'cosmos-debris' && !isDebrisVisible) {
-        satMesh.visible = false;
-      }
 
       earthGroup.add(satMesh);
       satObjectsMap.set(s.id, satMesh);
     }
   });
+
+  // Apply filters on the current satellites
+  updateVisibilities(sats);
 }
 
 // Relocates satellite mesh positions in 3D frame based on propagated Keplerian/SGP4 calculations

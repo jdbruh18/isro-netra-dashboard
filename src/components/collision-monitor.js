@@ -16,25 +16,79 @@ export function initCollisionMonitor() {
     // 1. Render Left panel list of assets
     renderAssetList(sats);
 
-    // 2. Perform collision conjunction analysis
+    // 2. Perform conjunction risk calculations
     analyzeConjunctionRisks(sats);
+  });
+
+  // Subscribe to activeCategory and searchQuery updates to re-render asset list instantly
+  store.subscribe('activeCategory', () => {
+    renderAssetList(store.getState().satellites);
+  });
+
+  store.subscribe('searchQuery', () => {
+    renderAssetList(store.getState().satellites);
   });
 }
 
 function renderAssetList(sats) {
   if (!assetListContainer) return;
 
-  const activeId = store.getState().activeSatelliteId;
+  const { activeCategory, searchQuery, activeSatelliteId } = store.getState();
   assetListContainer.innerHTML = '';
 
-  sats.forEach((s) => {
+  const filtered = sats.filter(s => {
+    // 1. Category Filter
+    if (activeCategory !== 'all' && s.category !== activeCategory) {
+      return false;
+    }
+
+    // 2. Search Query Filter
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const nameMatch = s.name && s.name.toLowerCase().includes(q);
+      const idMatch = s.id && s.id.toLowerCase().includes(q);
+      const noradMatch = s.tle2 && s.tle2.substring(2, 7).includes(q);
+      if (!nameMatch && !idMatch && !noradMatch) return false;
+    }
+    return true;
+  });
+
+  // Update dynamic count of shown assets vs active count
+  const lblAssetCount = document.getElementById('lbl-asset-count');
+  if (lblAssetCount) {
+    lblAssetCount.textContent = filtered.length;
+  }
+  const lblActiveCount = document.getElementById('lbl-active-count');
+  if (lblActiveCount) {
+    lblActiveCount.textContent = sats.length;
+  }
+
+  // Live coordinate update for the currently active satellite card
+  const activeSat = sats.find(s => s.id === activeSatelliteId);
+  if (activeSat) {
+    document.getElementById('sat-detail-name').textContent = activeSat.name;
+    document.getElementById('sat-detail-alt').textContent = `${activeSat.alt.toFixed(1)} km`;
+    document.getElementById('sat-detail-vel').textContent = `${activeSat.velocity.toFixed(2)} km/s`;
+    document.getElementById('sat-detail-lat').textContent = `${activeSat.lat ? activeSat.lat.toFixed(4) : '0.0000'}° N`;
+    document.getElementById('sat-detail-lng').textContent = `${activeSat.lng ? activeSat.lng.toFixed(4) : '0.0000'}° E`;
+    document.getElementById('sat-detail-status').textContent = activeSat.threatLevel === 'NORMAL' ? 'ORBIT OK' : 'CORRIDOR RISK';
+    
+    const statVal = document.getElementById('sat-detail-status');
+    if (activeSat.threatLevel === 'NORMAL') {
+      statVal.className = 'sat-details-val normal';
+    } else {
+      statVal.className = 'sat-details-val danger';
+    }
+  }
+
+  filtered.forEach((s) => {
     // Determine status color dot
     let dotClass = 'active';
     if (s.threatLevel === 'WARNING') dotClass = 'warning';
     if (s.threatLevel === 'DANGER') dotClass = 'danger';
 
     const row = document.createElement('div');
-    row.className = `satellite-row ${s.id === activeId ? 'selected' : ''}`;
+    row.className = `satellite-row ${s.id === activeSatelliteId ? 'selected' : ''}`;
     row.addEventListener('click', () => {
       store.updateState('activeSatelliteId', s.id);
       audio.playClick();
