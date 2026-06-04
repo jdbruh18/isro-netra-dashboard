@@ -154,12 +154,14 @@ function parseUplinkCommand(command) {
         store.addLog(`[UPLINK SUCCESS] ${target.name} orbit raised by +${altShift.toFixed(2)} km.`, 'success');
         audio.playSuccess();
 
-        // If WebSocket is active, notify backend of the manual command
-        const wsProtocol = window.location.protocol === 'http:' || window.location.protocol === 'https:';
-        if (wsProtocol && window.location.host) {
-          // Send manual command so server state syncs
-          // (Since we are in ES mode, the main socket connection can be utilized if available)
-        }
+        // Dispatch custom event to notify main websocket controller of manual thrust command
+        document.dispatchEvent(new CustomEvent('uplink-maneuver', {
+          detail: {
+            satelliteId: target.id,
+            deltaV: deltaV,
+            direction: "PROGRADE"
+          }
+        }));
       }, 1500);
       break;
 

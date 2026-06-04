@@ -92,7 +92,11 @@ export function propagateSatellite(tleLine1, tleLine2, date, altOffset = 0, kepl
   const lat = Math.asin(z3d / radiusRatio) * (180 / Math.PI);
   let lng = Math.atan2(y3d, x3d) * (180 / Math.PI);
   lng = (lng + (now / 240) * 360) % 360; // account for Earth rotation
-  if (lng > 180) lng -= 360;
+  
+  // Mathematical wrapping to [-180, 180] range
+  lng = (lng + 180) % 360;
+  if (lng < 0) lng += 360;
+  lng -= 180;
 
   return {
     lat,

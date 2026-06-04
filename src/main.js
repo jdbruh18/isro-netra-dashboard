@@ -119,6 +119,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     store.updateState('satellites', updatedSats);
     updateSatPositions3D(updatedSats);
   });
+
+  // 9. Listen for uplink maneuver events from components and forward to WebSocket server
+  document.addEventListener('uplink-maneuver', (e) => {
+    const { satelliteId, deltaV, direction } = e.detail;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        action: "MANEUVER_ORBIT",
+        satelliteId,
+        deltaV,
+        direction
+      }));
+    }
+  });
 });
 
 // Setup WebSocket Connection with automatic reconnection and fallback

@@ -356,6 +356,16 @@ When the user asks you questions or requests checks:
       store.updateState('satellites', [...sats]);
       store.addLog(`[UPLINK] Maneuver executed: ${direction} burn of ${deltaV} m/s. Orbit raised by +${altShift.toFixed(2)}km. (Gemini Client-side API Key)`, 'success');
       audio.playSuccess();
+
+      // Dispatch custom event to notify main websocket controller of agent thrust command
+      document.dispatchEvent(new CustomEvent('uplink-maneuver', {
+        detail: {
+          satelliteId: satelliteId,
+          deltaV: deltaV,
+          direction: direction
+        }
+      }));
+
       responseData = { status: "SUCCESS" };
     }
 

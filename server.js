@@ -195,18 +195,24 @@ app.get('/api/telemetry', (req, res) => {
 // REST Endpoint: Proxy Search query to CelesTrak to prevent client CORS blocks
 app.get('/api/catalog/search', async (req, res) => {
   const { query } = req.query;
-  if (!query) {
-    return res.status(400).json({ error: "Missing search query parameter." });
+  
+  // Input validation and sanitization to prevent type confusion or SSRF leaks
+  const cleanQuery = (typeof query === 'string') ? query.trim() : '';
+  if (!cleanQuery) {
+    return res.status(400).json({ error: "Missing or invalid search query parameter." });
+  }
+  if (cleanQuery.length > 100) {
+    return res.status(400).json({ error: "Search query string is too long (Max 100 characters)." });
   }
 
   try {
     let celestrakUrl = '';
-    const isNoradId = /^\d+$/.test(query);
+    const isNoradId = /^\d+$/.test(cleanQuery);
 
     if (isNoradId) {
-      celestrakUrl = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${query}&FORMAT=json`;
+      celestrakUrl = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${cleanQuery}&FORMAT=json`;
     } else {
-      celestrakUrl = `https://celestrak.org/NORAD/elements/gp.php?NAME=${encodeURIComponent(query)}&FORMAT=json`;
+      celestrakUrl = `https://celestrak.org/NORAD/elements/gp.php?NAME=${encodeURIComponent(cleanQuery)}&FORMAT=json`;
     }
 
     const response = await fetch(celestrakUrl);
@@ -229,8 +235,14 @@ app.post('/api/catalog/add', async (req, res) => {
     return res.status(400).json({ error: "Missing noradId in request body." });
   }
 
+  // Strictly validate noradId as numeric positive integer (max 8 digits) to block SSRF parameter injection
+  const cleanNoradId = noradId.toString().trim();
+  if (!/^\d{1,8}$/.test(cleanNoradId)) {
+    return res.status(400).json({ error: "Invalid noradId. Must be a numeric string up to 8 digits." });
+  }
+
   try {
-    const celestrakUrl = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${noradId}&FORMAT=json`;
+    const celestrakUrl = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${cleanNoradId}&FORMAT=json`;
     const response = await fetch(celestrakUrl);
     
     if (!response.ok) {
@@ -321,6 +333,11 @@ app.post('/api/gemini', async (req, res) => {
   }
 
   const { message, history } = req.body;
+
+  // Validate message to prevent crashes in Gemini SDK calls
+  if (!message || typeof message !== 'string' || !message.trim()) {
+    return res.status(400).json({ error: "Missing or invalid prompt message in request body." });
+  }
 
   try {
     const ai = new GoogleGenerativeAI(apiKey);
