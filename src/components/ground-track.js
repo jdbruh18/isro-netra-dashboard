@@ -160,12 +160,14 @@ function updateGroundTrackMap(sats) {
   }
 
   // Update popup coordinates
+  const altText = typeof activeSat.alt === 'number' ? `${activeSat.alt.toFixed(1)} km` : '---';
+  const velText = typeof activeSat.velocity === 'number' ? `${activeSat.velocity.toFixed(2)} km/s` : '---';
   const popupContent = `
     <div class="leaflet-popup-title">${activeSat.name}</div>
     <div style="display:flex; flex-direction:column; gap:2px;">
       <div><b>Owner:</b> ${activeSat.owner}</div>
-      <div><b>Altitude:</b> ${activeSat.alt.toFixed(1)} km</div>
-      <div><b>Velocity:</b> ${activeSat.velocity.toFixed(2)} km/s</div>
+      <div><b>Altitude:</b> ${altText}</div>
+      <div><b>Velocity:</b> ${velText}</div>
       <div><b>Geodetic:</b> ${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E</div>
       <div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed rgba(255,255,255,0.1);">
         <b>Conjunction risk:</b> <span class="sat-details-val ${activeSat.threatLevel === 'NORMAL' ? 'normal' : 'danger'}">${activeSat.threatLevel}</span>
@@ -177,7 +179,7 @@ function updateGroundTrackMap(sats) {
   // 3. Recalculate geodesic RF coverage footprint circle
   // Radius calculation: theta = acos(R_earth / (R_earth + alt))
   const earthRadius = 6378.137;
-  const h = Math.max(0, activeSat.alt);
+  const h = typeof activeSat.alt === 'number' ? Math.max(0, activeSat.alt) : 0;
   const theta = Math.acos(earthRadius / (earthRadius + h));
   const footprintRadiusMeters = earthRadius * 1000 * theta;
 

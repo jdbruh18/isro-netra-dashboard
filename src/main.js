@@ -184,23 +184,28 @@ function setupWebsocketConnection() {
         // Merge coordinate positions keeping frontend metadata (like user selections & burns)
         const merged = serverSats.map((serverSat, idx) => {
           const localSat = currentLocal.find(s => s.id === serverSat.id);
+          
+          // Pre-propagate coordinates on client as fallback
+          const offset = (localSat && localSat.burnAdjustments) ? localSat.burnAdjustments.alt : 0;
+          const res = propagateSatellite(serverSat.tle1, serverSat.tle2, store.getState().simTime, offset, idx);
+
           if (localSat) {
-            localSat.lat = serverSat.lat;
-            localSat.lng = serverSat.lng;
-            localSat.alt = serverSat.alt;
-            localSat.velocity = serverSat.velocity;
+            localSat.lat = typeof serverSat.lat === 'number' ? serverSat.lat : res.lat;
+            localSat.lng = typeof serverSat.lng === 'number' ? serverSat.lng : res.lng;
+            localSat.alt = typeof serverSat.alt === 'number' ? serverSat.alt : res.alt;
+            localSat.velocity = typeof serverSat.velocity === 'number' ? serverSat.velocity : res.velocity;
             localSat.threatLevel = serverSat.threatLevel;
             localSat.threatDetails = serverSat.threatDetails;
             localSat.category = serverSat.category || localSat.category;
-            
-            // Re-propagate 3D Cartesian coordinates for ThreeJS
-            const offset = localSat.burnAdjustments ? localSat.burnAdjustments.alt : 0;
-            const res = propagateSatellite(localSat.tle1, localSat.tle2, store.getState().simTime, offset, idx);
             localSat.position3d = res.position3d;
+            if (serverSat.health) localSat.health = serverSat.health;
             return localSat;
           } else {
             // New satellite added dynamically, propagate initial coordinates
-            const res = propagateSatellite(serverSat.tle1, serverSat.tle2, store.getState().simTime, 0, idx);
+            serverSat.lat = typeof serverSat.lat === 'number' ? serverSat.lat : res.lat;
+            serverSat.lng = typeof serverSat.lng === 'number' ? serverSat.lng : res.lng;
+            serverSat.alt = typeof serverSat.alt === 'number' ? serverSat.alt : res.alt;
+            serverSat.velocity = typeof serverSat.velocity === 'number' ? serverSat.velocity : res.velocity;
             serverSat.position3d = res.position3d;
             return serverSat;
           }

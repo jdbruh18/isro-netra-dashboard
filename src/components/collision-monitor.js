@@ -38,10 +38,10 @@ export function initCollisionMonitor() {
 function updateSatelliteDetails(sat) {
   if (!sat) return;
   document.getElementById('sat-detail-name').textContent = sat.name;
-  document.getElementById('sat-detail-alt').textContent = `${sat.alt.toFixed(1)} km`;
-  document.getElementById('sat-detail-vel').textContent = `${sat.velocity.toFixed(2)} km/s`;
-  document.getElementById('sat-detail-lat').textContent = `${sat.lat ? sat.lat.toFixed(4) : '0.0000'}° N`;
-  document.getElementById('sat-detail-lng').textContent = `${sat.lng ? sat.lng.toFixed(4) : '0.0000'}° E`;
+  document.getElementById('sat-detail-alt').textContent = typeof sat.alt === 'number' ? `${sat.alt.toFixed(1)} km` : '---';
+  document.getElementById('sat-detail-vel').textContent = typeof sat.velocity === 'number' ? `${sat.velocity.toFixed(2)} km/s` : '---';
+  document.getElementById('sat-detail-lat').textContent = typeof sat.lat === 'number' ? `${sat.lat.toFixed(4)}° N` : '0.0000° N';
+  document.getElementById('sat-detail-lng').textContent = typeof sat.lng === 'number' ? `${sat.lng.toFixed(4)}° E` : '0.0000° E';
   document.getElementById('sat-detail-status').textContent = sat.threatLevel === 'NORMAL' ? 'ORBIT OK' : 'CORRIDOR RISK';
   
   const statVal = document.getElementById('sat-detail-status');
@@ -176,9 +176,10 @@ function renderAssetList(sats) {
 
     const rightSec = document.createElement('div');
     rightSec.className = 'sat-row-right';
+    const altValue = typeof s.alt === 'number' ? s.alt.toFixed(0) : '---';
     rightSec.innerHTML = `
       <span class="status-dot ${dotClass}"></span>
-      <span class="sat-row-type" style="font-family:var(--font-mono);">${s.alt.toFixed(0)} km</span>
+      <span class="sat-row-type" style="font-family:var(--font-mono);">${altValue} km</span>
     `;
 
     row.appendChild(leftSec);

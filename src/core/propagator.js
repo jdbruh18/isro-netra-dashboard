@@ -19,7 +19,7 @@ export function propagateSatellite(tleLine1, tleLine2, date, altOffset = 0, kepl
 
       if (positionEci && velocityEci) {
         // 3. Compute Greenwich Mean Sidereal Time
-        const gmst = lib.gstimest(date);
+        const gmst = typeof lib.gstimest === 'function' ? lib.gstimest(date) : lib.gstime(date);
         
         // 4. Convert ECI coordinates to Geodetic
         const positionGeodetic = lib.eciToGeodetic(positionEci, gmst);
