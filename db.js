@@ -24,7 +24,13 @@ const DEFAULT_SATELLITES = [
     threatDetails: "Normal orbital operations.",
     tle1: "1 99901U 26001A   26155.50000000  .00020000  00000-0  10000-3 0  9991",
     tle2: "2 99901  51.6400 120.5000 0005000  30.0000 330.0000 15.60000000    12",
-    category: "indian"
+    category: "indian",
+    health: {
+      solarV: 32.4,
+      battTemp: 28.5,
+      downlinkSNR: 24.5,
+      fuelPressure: 220
+    }
   },
   {
     id: "cosmos-debris",
@@ -39,7 +45,13 @@ const DEFAULT_SATELLITES = [
     threatDetails: "Intersection route with Gaganyaan capsule.",
     tle1: "1 99902U 21000A   26155.49900000  .00030000  00000-0  20000-3 0  9995",
     tle2: "2 99902  51.6420 120.4850 0005200  28.0000 332.0000 15.60150000    16",
-    category: "debris"
+    category: "debris",
+    health: {
+      solarV: 0.0,
+      battTemp: 0.0,
+      downlinkSNR: 0.0,
+      fuelPressure: 0.0
+    }
   },
   {
     id: "cartosat-3",
@@ -54,7 +66,13 @@ const DEFAULT_SATELLITES = [
     threatDetails: "Imaging payload operational.",
     tle1: "1 44804U 19081A   26155.50000000  .00001000  00000-0  50000-4 0  9992",
     tle2: "2 44804  97.4000 230.1200 0012000  90.0000 270.0000 15.20000000    13",
-    category: "indian"
+    category: "indian",
+    health: {
+      solarV: 31.8,
+      battTemp: 27.2,
+      downlinkSNR: 22.8,
+      fuelPressure: 180
+    }
   },
   {
     id: "navic-1i",
@@ -69,7 +87,13 @@ const DEFAULT_SATELLITES = [
     threatDetails: "NavIC atomic clock synchronization stable.",
     tle1: "1 43286U 18035A   26155.50000000  .00000100  00000-0  00000-0 0  9993",
     tle2: "2 43286  29.0000  80.2000 0020000 180.0000 180.0000  1.00270000    14",
-    category: "indian"
+    category: "indian",
+    health: {
+      solarV: 34.1,
+      battTemp: 29.8,
+      downlinkSNR: 25.1,
+      fuelPressure: 450
+    }
   }
 ];
 

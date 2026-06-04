@@ -55,6 +55,19 @@ class StateStore {
 
   // Update a specific state key and notify subscribers
   updateState(key, newValue) {
+    if (key === 'satellites' && Array.isArray(newValue)) {
+      newValue.forEach(s => {
+        if (!s.health) {
+          const isDebris = s.id === 'cosmos-debris' || (s.category && s.category === 'debris') || (s.name && s.name.toLowerCase().includes('debris'));
+          s.health = {
+            solarV: isDebris ? 0.0 : 32.4,
+            battTemp: isDebris ? 0.0 : 28.5,
+            downlinkSNR: isDebris ? 0.0 : 24.5,
+            fuelPressure: isDebris ? 0.0 : (s.id === 'navic-1i' ? 450 : 220)
+          };
+        }
+      });
+    }
     this.state[key] = newValue;
     this.notify(key);
   }
@@ -115,6 +128,9 @@ class StateStore {
 
       // 3. Simulate solar weather fluctuations
       this.tickSpaceWeather();
+      
+      // 4. Correlate weather to spacecraft subsystem health
+      this.tickSpacecraftHealth();
 
     }, 1000);
   }
@@ -153,6 +169,62 @@ class StateStore {
     }
 
     this.notify('spaceWeather');
+  }
+
+  // Correlate weather factors to active satellite systems health parameters (the Butterfly Effect)
+  tickSpacecraftHealth() {
+    const weather = this.state.spaceWeather;
+    const sats = this.state.satellites;
+    const isStorm = weather.solarProtonFlux > 15.0 || weather.kpIndex >= 4.5;
+
+    sats.forEach(s => {
+      if (!s.health) return;
+      const isDebris = s.id === 'cosmos-debris' || (s.category && s.category === 'debris') || (s.name && s.name.toLowerCase().includes('debris'));
+      if (isDebris) {
+        s.health.solarV = 0.0;
+        s.health.battTemp = 0.0;
+        s.health.downlinkSNR = 0.0;
+        s.health.fuelPressure = 0.0;
+        return;
+      }
+
+      // 1. Battery Temp correlation (induced currents during magnetic surges)
+      if (isStorm) {
+        s.health.battTemp += 0.4;
+        if (s.health.battTemp > 52.0) s.health.battTemp = 52.0;
+      } else {
+        s.health.battTemp -= 0.2;
+        if (s.health.battTemp < 28.5) s.health.battTemp = 28.5;
+      }
+
+      // 2. Comms Link SNR degradation (ionospheric scintillation)
+      const noise = (Math.random() - 0.5) * 1.0;
+      s.health.downlinkSNR = 26.5 - weather.kpIndex * 2.2 + noise;
+      if (s.health.downlinkSNR < 5.0) s.health.downlinkSNR = 5.0;
+      if (s.health.downlinkSNR > 30.0) s.health.downlinkSNR = 30.0;
+
+      // 3. Solar panel voltage fluctuations (charge ionization drops panel efficiency)
+      if (isStorm) {
+        s.health.solarV += (Math.random() - 0.5) * 2.0 - 0.4;
+        if (s.health.solarV < 16.5) s.health.solarV = 16.5;
+        if (s.health.solarV > 34.0) s.health.solarV = 34.0;
+      } else {
+        s.health.solarV += (32.4 - s.health.solarV) * 0.1;
+      }
+
+      // 4. Fuel Propellant pressure (stable with tiny variations)
+      s.health.fuelPressure += (Math.random() - 0.5) * 0.3;
+      if (s.health.fuelPressure < 10.0) s.health.fuelPressure = 10.0;
+
+      // 5. Atmospheric drag altitude decay (solar wind expands thermosphere)
+      if (s.alt < 600) {
+        const decayRate = weather.solarWindSpeed > 500 ? 0.015 : 0.002;
+        s.alt -= decayRate;
+        if (s.alt < 100) s.alt = 100; // block atmospheric burning re-entry
+      }
+    });
+
+    this.notify('satellites');
   }
 }
 

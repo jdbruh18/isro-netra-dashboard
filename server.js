@@ -36,7 +36,13 @@ let serverTelemetry = {
       tle1: "1 99901U 26001A   26155.50000000  .00020000  00000-0  10000-3 0  9991",
       tle2: "2 99901  51.6400 120.5000 0005000  30.0000 330.0000 15.60000000    12",
       category: "indian",
-      burnAdjustments: { alt: 0 } // Tracks delta-V shifts
+      burnAdjustments: { alt: 0 }, // Tracks delta-V shifts
+      health: {
+        solarV: 32.4,
+        battTemp: 28.5,
+        downlinkSNR: 24.5,
+        fuelPressure: 220
+      }
     },
     {
       id: "cosmos-debris",
@@ -51,7 +57,13 @@ let serverTelemetry = {
       threatDetails: "Intersection route with Gaganyaan capsule.",
       tle1: "1 99902U 21000A   26155.49900000  .00030000  00000-0  20000-3 0  9995",
       tle2: "2 99902  51.6420 120.4850 0005200  28.0000 332.0000 15.60150000    16",
-      category: "debris"
+      category: "debris",
+      health: {
+        solarV: 0.0,
+        battTemp: 0.0,
+        downlinkSNR: 0.0,
+        fuelPressure: 0.0
+      }
     },
     {
       id: "cartosat-3",
@@ -66,7 +78,13 @@ let serverTelemetry = {
       threatDetails: "Imaging payload operational.",
       tle1: "1 44804U 19081A   26155.50000000  .00001000  00000-0  50000-4 0  9992",
       tle2: "2 44804  97.4000 230.1200 0012000  90.0000 270.0000 15.20000000    13",
-      category: "indian"
+      category: "indian",
+      health: {
+        solarV: 31.8,
+        battTemp: 27.2,
+        downlinkSNR: 22.8,
+        fuelPressure: 180
+      }
     },
     {
       id: "navic-1i",
@@ -81,7 +99,13 @@ let serverTelemetry = {
       threatDetails: "NavIC atomic clock synchronization stable.",
       tle1: "1 43286U 18035A   26155.50000000  .00000100  00000-0  00000-0 0  9993",
       tle2: "2 43286  29.0000  80.2000 0020000 180.0000 180.0000  1.00270000    14",
-      category: "indian"
+      category: "indian",
+      health: {
+        solarV: 34.1,
+        battTemp: 29.8,
+        downlinkSNR: 25.1,
+        fuelPressure: 450
+      }
     }
   ],
   spaceWeather: {
@@ -397,6 +421,10 @@ app.post('/api/gemini', async (req, res) => {
             }
           },
           {
+            name: "get_anomaly_diagnostics",
+            description: "Fetch real-time micro-telemetry diagnostic variables (battery thermals, solar panel efficiency, communication signal quality, propellant pressure) to scan for space weather induced anomalies."
+          },
+          {
             name: "execute_orbital_burn",
             description: "Executes thruster ignition on the satellite, altering its altitude and shifting its SGP4 orbital path to avoid conjunction collisions.",
             parameters: {
@@ -419,13 +447,15 @@ app.post('/api/gemini', async (req, res) => {
       tools: tools,
       systemInstruction: `You are the ISRO NETRA Space Operations AI Commander at ISTRAC Bengaluru.
 You monitor Indian satellites (including Gaganyaan-1, Cartosat-3, NavIC constellation) and debris alerts.
-When the user asks you questions or requests checks:
+You understand the "butterfly effect" of solar activity on spacecraft subsystems.
+When the user asks you questions, requests checks, or coordinates maneuvers:
 1. First, query 'get_satellite_states' to review coordinates and danger flags.
-2. If any satellite has a threat level of 'WARNING' or 'DANGER', immediately run 'calculate_avoidance_vector' to get orbital thrust metrics.
-3. Before calling 'execute_orbital_burn' to execute a burn, you MUST consult the Aditya Solar Physics Analyst using the 'consult_solar_physics_analyst' tool to check space weather safety.
-4. If the Analyst reports status 'ABORT', you MUST abort the maneuver. Explain the Aditya-L1 solar storm / ESD radiation hazard details to the operator and do NOT call 'execute_orbital_burn'.
-5. If the Analyst reports status 'CLEAR', proceed with calling 'execute_orbital_burn' to execute the maneuver.
-6. Report your actions step-by-step, including the delta-v values, the Analyst weather consensus dialog, and altitude shifts.
+2. Call 'get_anomaly_diagnostics' to fetch the real-time health telemetry variables (thermals, SNR, voltage) of active satellites. If any systems are degraded (battery temp > 45°C or comms SNR < 12dB), report these specific anomalies to the operator and analyze how they correlate with the active solar weather.
+3. If any satellite has a threat level of 'WARNING' or 'DANGER', run 'calculate_avoidance_vector' to get orbital thrust metrics.
+4. Before calling 'execute_orbital_burn' to execute a burn, you MUST consult the Aditya Solar Physics Analyst using the 'consult_solar_physics_analyst' tool to check space weather safety.
+5. If the Analyst reports status 'ABORT', or if critical spacecraft anomalies (like battery temp > 48°C) render the electronics too sensitive for thrust ignition, abort the maneuver. Explain the solar storm / ESD radiation hazard details to the operator and do NOT call 'execute_orbital_burn'.
+6. If the Analyst reports status 'CLEAR' and spacecraft thermals/systems are stable, proceed with calling 'execute_orbital_burn' to execute the maneuver.
+7. Report your actions step-by-step, including the delta-v values, the Analyst weather consensus dialog, diagnosed subsystem anomalies, and altitude shifts.
 Format your final response in clear, concise markdown with appropriate headers. Keep it professional and military-grade.`
     });
 
@@ -456,6 +486,13 @@ Format your final response in clear, concise markdown with appropriate headers. 
           toolResult = { satellites: serverTelemetry.satellites };
         } else if (name === "get_space_weather") {
           toolResult = { spaceWeather: serverTelemetry.spaceWeather };
+        } else if (name === "get_anomaly_diagnostics") {
+          const diagnostics = serverTelemetry.satellites.map(s => ({
+            id: s.id,
+            name: s.name,
+            health: s.health || { solarV: 32.4, battTemp: 28.5, downlinkSNR: 24.5, fuelPressure: 220 }
+          }));
+          toolResult = { diagnostics };
         } else if (name === "consult_solar_physics_analyst") {
           const weather = serverTelemetry.spaceWeather;
           let analystResult = null;
@@ -573,6 +610,9 @@ Return your response strictly in the following JSON format:
 
 // Host and update real-time telemetry coordinates internally every 1s
 setInterval(() => {
+  const weather = serverTelemetry.spaceWeather;
+  const isStorm = weather.solarProtonFlux > 15.0 || weather.kpIndex >= 4.5;
+
   // Simulates small movements or tracks real SGP4 values when frontend streams them
   // Keep values updated inside server memory
   serverTelemetry.satellites.forEach(s => {
@@ -581,11 +621,66 @@ setInterval(() => {
     } else {
       s.lng = (s.lng + 0.051) % 180; // Debris moves slightly faster to simulate intersection
     }
+
+    // Seed default health structure if missing in memory
+    if (!s.health) {
+      const isDebris = s.id === 'cosmos-debris' || (s.category && s.category === 'debris') || (s.name && s.name.toLowerCase().includes('debris'));
+      s.health = {
+        solarV: isDebris ? 0.0 : 32.4,
+        battTemp: isDebris ? 0.0 : 28.5,
+        downlinkSNR: isDebris ? 0.0 : 24.5,
+        fuelPressure: isDebris ? 0.0 : (s.id === 'navic-1i' ? 450 : 220)
+      };
+    }
+
+    // Dynamic health parameters updates (Geomagnetic battery spikes, Comms SNR scintillation, solar V drops)
+    const isDebris = s.id === 'cosmos-debris' || (s.category && s.category === 'debris') || (s.name && s.name.toLowerCase().includes('debris'));
+    if (!isDebris) {
+      // 1. Battery Temp correlation
+      if (isStorm) {
+        s.health.battTemp += 0.4;
+        if (s.health.battTemp > 52.0) s.health.battTemp = 52.0;
+      } else {
+        s.health.battTemp -= 0.2;
+        if (s.health.battTemp < 28.5) s.health.battTemp = 28.5;
+      }
+
+      // 2. Comms Link SNR degradation
+      const noise = (Math.random() - 0.5) * 1.0;
+      s.health.downlinkSNR = 26.5 - weather.kpIndex * 2.2 + noise;
+      if (s.health.downlinkSNR < 5.0) s.health.downlinkSNR = 5.0;
+      if (s.health.downlinkSNR > 30.0) s.health.downlinkSNR = 30.0;
+
+      // 3. Solar Panel Voltage
+      if (isStorm) {
+        s.health.solarV += (Math.random() - 0.5) * 2.0 - 0.4;
+        if (s.health.solarV < 16.5) s.health.solarV = 16.5;
+        if (s.health.solarV > 34.0) s.health.solarV = 34.0;
+      } else {
+        s.health.solarV += (32.4 - s.health.solarV) * 0.1;
+      }
+
+      // 4. Fuel Propellant pressure
+      s.health.fuelPressure += (Math.random() - 0.5) * 0.3;
+      if (s.health.fuelPressure < 10.0) s.health.fuelPressure = 10.0;
+
+      // 5. Atmospheric drag decay (wind heats thermosphere -> decays orbit)
+      if (s.alt < 600) {
+        const decayRate = weather.solarWindSpeed > 500 ? 0.015 : 0.002;
+        s.alt -= decayRate;
+        if (s.alt < 100) s.alt = 100;
+      }
+    }
   });
   
   // Tick weather parameters inside server memory
-  serverTelemetry.spaceWeather.solarWindSpeed += Math.floor((Math.random() - 0.5) * 6);
-  serverTelemetry.spaceWeather.solarProtonFlux = 10 + Math.random() * 8;
+  weather.solarWindSpeed += Math.floor((Math.random() - 0.5) * 6);
+  if (weather.solarWindSpeed < 300) weather.solarWindSpeed = 300;
+  if (weather.solarWindSpeed > 800) weather.solarWindSpeed = 800;
+
+  weather.solarProtonFlux += (Math.random() - 0.5) * 1.2;
+  if (weather.solarProtonFlux < 5) weather.solarProtonFlux = 5;
+  if (weather.solarProtonFlux > 150) weather.solarProtonFlux = 150;
   
   broadcastTelemetry("TELEMETRY_CLOCK_TICK", serverTelemetry);
 }, 1000);

@@ -166,18 +166,33 @@ async function queryGeminiAgent(message, typingId) {
     let reply = "";
     const lower = message.toLowerCase();
 
-    if (lower.includes('status') || lower.includes('diagnose') || lower.includes('check')) {
+    if (lower.includes('status') || lower.includes('diagnose') || lower.includes('check') || lower.includes('anomaly')) {
       const sats = store.getState().satellites;
+      const weather = store.getState().spaceWeather;
       const dangerous = sats.find(s => s.threatLevel === 'WARNING');
       
       // Simulate Gemini calling get_satellite_states
       store.addAgentLog("get_satellite_states", {}, { satellites: sats });
       store.addLog("[GEMINI-AGENT] Tool Call: get_satellite_states()", 'ai');
 
-      if (dangerous) {
-        reply = `**A.E.G.I.S. Space Intelligence Report**\n\nI executed \`get_satellite_states\` and detected a potential conjunction risk:\n- Target: **Gaganyaan Crew Module**\n- Intersector: **${dangerous.name}**\n- Status: **DANGER**\n\nI recommend executing a prograde thruster burn to raise Gaganyaan's orbit. Ask me to: **"evade collision"** or **"clear orbit path"** to initiate defense burn.`;
+      // Simulate Gemini calling get_anomaly_diagnostics
+      const diagnostics = sats.map(s => ({
+        id: s.id,
+        name: s.name,
+        health: s.health || { solarV: 32.4, battTemp: 28.5, downlinkSNR: 24.5, fuelPressure: 220 }
+      }));
+      store.addAgentLog("get_anomaly_diagnostics", {}, { diagnostics });
+      store.addLog("[GEMINI-AGENT] Tool Call: get_anomaly_diagnostics()", 'ai');
+
+      const isStorm = weather.solarProtonFlux > 15.0 || weather.kpIndex >= 4.5;
+      const anomalousSat = sats.find(s => s.health && s.id !== 'cosmos-debris' && (s.health.battTemp > 45.0 || s.health.downlinkSNR < 12.0));
+
+      if (anomalousSat && isStorm) {
+        reply = `**A.E.G.I.S. Space Operations Diagnostic Report**\n\nI ran full telemetry checks and detected severe solar storm induced anomalies (the Butterfly Effect):\n\n- **Space Asset**: ${anomalousSat.name}\n- **Subsystem Anomalies**:\n  - Battery Temperature: **${anomalousSat.health.battTemp.toFixed(1)}°C** (Geomagnetically Induced Currents warming - CRITICAL)\n  - Communication Downlink SNR: **${anomalousSat.health.downlinkSNR.toFixed(1)} dB** (Ionospheric Scintillation interference)\n  - Solar Panel Voltage: **${anomalousSat.health.solarV.toFixed(1)} V** (Proton charge scramble)\n\n- **Conjunction Danger**: ${dangerous ? `YES - threat corridor intersect with ${dangerous.name}` : 'NO - orbital corridor clear'}\n\n**Recommendation**: Defer thruster maneuver uplinks immediately. Firing thrusters while the batteries are in thermal warning risks static breakdown. Initiate radiation shielding recovery.`;
+      } else if (dangerous) {
+        reply = `**A.E.G.I.S. Space Intelligence Report**\n\nI executed telemetry checks. Subsystems are stable, but a conjunction warning is active:\n- Target: **Gaganyaan Crew Module**\n- Intersector: **${dangerous.name}**\n- Status: **DANGER**\n\nSpace weather is CLEAR. I recommend executing an evasive burn. Ask me to: **"evade collision"** to steer Gaganyaan.`;
       } else {
-        reply = `**A.E.G.I.S. Space Intelligence Report**\n\nAll space assets are verified healthy. ISS/Gaganyaan orbital corridors are clear. Solar storm status is QUIET.`;
+        reply = `**A.E.G.I.S. Space Intelligence Report**\n\nAll space assets are verified healthy. Subsystem parameters (voltage, thermals, comms link) are stable. Solar weather is QUIET.`;
       }
     } 
     
@@ -273,13 +288,15 @@ async function executeClientSideGemini(message, apiKey) {
       parts: [{
         text: `You are the ISRO NETRA Space Operations AI Commander at ISTRAC Bengaluru.
 You monitor Indian satellites (including Gaganyaan-1, Cartosat-3, NavIC constellation) and debris alerts.
-When the user asks you questions or requests checks:
+You understand the "butterfly effect" of solar activity on spacecraft subsystems.
+When the user asks you questions, requests checks, or coordinates maneuvers:
 1. First, query 'get_satellite_states' to review coordinates and danger flags.
-2. If any satellite has a threat level of 'WARNING' or 'DANGER', immediately run 'calculate_avoidance_vector' to get orbital thrust metrics.
-3. Before calling 'execute_orbital_burn' to execute a burn, you MUST consult the Aditya Solar Physics Analyst using the 'consult_solar_physics_analyst' tool to check space weather safety.
-4. If the Analyst reports status 'ABORT', you MUST abort the maneuver. Explain the Aditya-L1 solar storm / ESD radiation hazard details to the operator and do NOT call 'execute_orbital_burn'.
-5. If the Analyst reports status 'CLEAR', proceed with calling 'execute_orbital_burn' to execute the maneuver.
-6. Report your actions step-by-step, including the delta-v values, the Analyst weather consensus dialog, and altitude shifts.
+2. Call 'get_anomaly_diagnostics' to fetch the real-time health telemetry variables (thermals, SNR, voltage) of active satellites. If any systems are degraded (battery temp > 45°C or comms SNR < 12dB), report these specific anomalies to the operator and analyze how they correlate with the active solar weather.
+3. If any satellite has a threat level of 'WARNING' or 'DANGER', run 'calculate_avoidance_vector' to get orbital thrust metrics.
+4. Before calling 'execute_orbital_burn' to execute a burn, you MUST consult the Aditya Solar Physics Analyst using the 'consult_solar_physics_analyst' tool to check space weather safety.
+5. If the Analyst reports status 'ABORT', or if critical spacecraft anomalies (like battery temp > 48°C) render the electronics too sensitive for thruster ignition, abort the maneuver. Explain the solar storm / ESD radiation hazard details to the operator and do NOT call 'execute_orbital_burn'.
+6. If the Analyst reports status 'CLEAR' and spacecraft thermals/systems are stable, proceed with calling 'execute_orbital_burn' to execute the maneuver.
+7. Report your actions step-by-step, including the delta-v values, the Analyst weather consensus dialog, diagnosed subsystem anomalies, and altitude shifts.
 Format your final response in clear, concise markdown with appropriate headers. Keep it professional and military-grade.`
       }]
     },
@@ -292,6 +309,10 @@ Format your final response in clear, concise markdown with appropriate headers. 
         {
           name: "get_space_weather",
           description: "Retrieve Aditya-L1 solar observatory sensor telemetry: Kp-index, solar flux, magnetometer (magX/Y/Z) readings, and storm levels."
+        },
+        {
+          name: "get_anomaly_diagnostics",
+          description: "Fetch real-time micro-telemetry diagnostic variables (battery thermals, solar panel efficiency, communication signal quality, propellant pressure) to scan for space weather induced anomalies."
         },
         {
           name: "consult_solar_physics_analyst",
@@ -360,6 +381,13 @@ Format your final response in clear, concise markdown with appropriate headers. 
       responseData = { satellites: sats };
     } else if (name === "get_space_weather") {
       responseData = { spaceWeather: weather };
+    } else if (name === "get_anomaly_diagnostics") {
+      const diagnostics = sats.map(s => ({
+        id: s.id,
+        name: s.name,
+        health: s.health || { solarV: 32.4, battTemp: 28.5, downlinkSNR: 24.5, fuelPressure: 220 }
+      }));
+      responseData = { diagnostics };
     } else if (name === "consult_solar_physics_analyst") {
       let analystResult = null;
       try {

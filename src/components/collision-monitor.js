@@ -28,6 +28,90 @@ export function initCollisionMonitor() {
   store.subscribe('searchQuery', () => {
     renderAssetList(store.getState().satellites);
   });
+
+  // Re-render when active selection changes to highlight correct row
+  store.subscribe('activeSatelliteId', () => {
+    renderAssetList(store.getState().satellites);
+  });
+}
+
+function updateSatelliteDetails(sat) {
+  if (!sat) return;
+  document.getElementById('sat-detail-name').textContent = sat.name;
+  document.getElementById('sat-detail-alt').textContent = `${sat.alt.toFixed(1)} km`;
+  document.getElementById('sat-detail-vel').textContent = `${sat.velocity.toFixed(2)} km/s`;
+  document.getElementById('sat-detail-lat').textContent = `${sat.lat ? sat.lat.toFixed(4) : '0.0000'}° N`;
+  document.getElementById('sat-detail-lng').textContent = `${sat.lng ? sat.lng.toFixed(4) : '0.0000'}° E`;
+  document.getElementById('sat-detail-status').textContent = sat.threatLevel === 'NORMAL' ? 'ORBIT OK' : 'CORRIDOR RISK';
+  
+  const statVal = document.getElementById('sat-detail-status');
+  if (sat.threatLevel === 'NORMAL') {
+    statVal.className = 'sat-details-val normal';
+  } else {
+    statVal.className = 'sat-details-val danger';
+  }
+
+  // Update subsystem health indicators (Sprint 4)
+  const solarEl = document.getElementById('sat-detail-solar');
+  const battEl = document.getElementById('sat-detail-batt-temp');
+  const snrEl = document.getElementById('sat-detail-snr');
+  const fuelEl = document.getElementById('sat-detail-fuel');
+
+  if (solarEl && battEl && snrEl && fuelEl) {
+    if (sat.health) {
+      solarEl.textContent = `${sat.health.solarV.toFixed(1)} V`;
+      battEl.textContent = `${sat.health.battTemp.toFixed(1)}°C`;
+      snrEl.textContent = `${sat.health.downlinkSNR.toFixed(1)} dB`;
+      fuelEl.textContent = `${sat.health.fuelPressure.toFixed(0)} psi`;
+
+      const isDebris = sat.id === 'cosmos-debris' || (sat.category && sat.category === 'debris') || (sat.name && sat.name.toLowerCase().includes('debris'));
+
+      if (isDebris) {
+        solarEl.className = 'sat-details-val';
+        battEl.className = 'sat-details-val';
+        snrEl.className = 'sat-details-val';
+        fuelEl.className = 'sat-details-val';
+      } else {
+        // Solar panel voltage: normal ~32V, warning < 25V, danger < 20V
+        if (sat.health.solarV < 20.0) {
+          solarEl.className = 'sat-details-val danger';
+        } else if (sat.health.solarV < 25.0) {
+          solarEl.className = 'sat-details-val warning';
+        } else {
+          solarEl.className = 'sat-details-val normal';
+        }
+
+        // Battery Temp: normal < 40°C, warning > 45°C, danger > 48°C
+        if (sat.health.battTemp > 48.0) {
+          battEl.className = 'sat-details-val danger';
+        } else if (sat.health.battTemp > 45.0) {
+          battEl.className = 'sat-details-val warning';
+        } else {
+          battEl.className = 'sat-details-val normal';
+        }
+
+        // Comms SNR: normal > 18dB, warning < 15dB, danger < 12dB
+        if (sat.health.downlinkSNR < 12.0) {
+          snrEl.className = 'sat-details-val danger';
+        } else if (sat.health.downlinkSNR < 15.0) {
+          snrEl.className = 'sat-details-val warning';
+        } else {
+          snrEl.className = 'sat-details-val normal';
+        }
+
+        fuelEl.className = 'sat-details-val normal';
+      }
+    } else {
+      solarEl.textContent = 'N/A';
+      battEl.textContent = 'N/A';
+      snrEl.textContent = 'N/A';
+      fuelEl.textContent = 'N/A';
+      solarEl.className = 'sat-details-val';
+      battEl.className = 'sat-details-val';
+      snrEl.className = 'sat-details-val';
+      fuelEl.className = 'sat-details-val';
+    }
+  }
 }
 
 function renderAssetList(sats) {
@@ -66,19 +150,7 @@ function renderAssetList(sats) {
   // Live coordinate update for the currently active satellite card
   const activeSat = sats.find(s => s.id === activeSatelliteId);
   if (activeSat) {
-    document.getElementById('sat-detail-name').textContent = activeSat.name;
-    document.getElementById('sat-detail-alt').textContent = `${activeSat.alt.toFixed(1)} km`;
-    document.getElementById('sat-detail-vel').textContent = `${activeSat.velocity.toFixed(2)} km/s`;
-    document.getElementById('sat-detail-lat').textContent = `${activeSat.lat ? activeSat.lat.toFixed(4) : '0.0000'}° N`;
-    document.getElementById('sat-detail-lng').textContent = `${activeSat.lng ? activeSat.lng.toFixed(4) : '0.0000'}° E`;
-    document.getElementById('sat-detail-status').textContent = activeSat.threatLevel === 'NORMAL' ? 'ORBIT OK' : 'CORRIDOR RISK';
-    
-    const statVal = document.getElementById('sat-detail-status');
-    if (activeSat.threatLevel === 'NORMAL') {
-      statVal.className = 'sat-details-val normal';
-    } else {
-      statVal.className = 'sat-details-val danger';
-    }
+    updateSatelliteDetails(activeSat);
   }
 
   filtered.forEach((s) => {
@@ -92,21 +164,7 @@ function renderAssetList(sats) {
     row.addEventListener('click', () => {
       store.updateState('activeSatelliteId', s.id);
       audio.playClick();
-      
-      // Update Detail UI panel metadata
-      document.getElementById('sat-detail-name').textContent = s.name;
-      document.getElementById('sat-detail-alt').textContent = `${s.alt.toFixed(1)} km`;
-      document.getElementById('sat-detail-vel').textContent = `${s.velocity.toFixed(2)} km/s`;
-      document.getElementById('sat-detail-lat').textContent = `${s.lat ? s.lat.toFixed(4) : '0.0000'}° N`;
-      document.getElementById('sat-detail-lng').textContent = `${s.lng ? s.lng.toFixed(4) : '0.0000'}° E`;
-      document.getElementById('sat-detail-status').textContent = s.threatLevel === 'NORMAL' ? 'ORBIT OK' : 'CORRIDOR RISK';
-      
-      const statVal = document.getElementById('sat-detail-status');
-      if (s.threatLevel === 'NORMAL') {
-        statVal.className = 'sat-details-val normal';
-      } else {
-        statVal.className = 'sat-details-val danger';
-      }
+      updateSatelliteDetails(s);
     });
 
     const leftSec = document.createElement('div');
