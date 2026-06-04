@@ -143,9 +143,15 @@ async function executeManeuver(satId, deltaV, direction, source = "Manual Contro
   const sat = serverTelemetry.satellites.find(s => s.id === satId);
   if (!sat) return { status: "ERROR", message: "Satellite not found" };
 
+  // Validate thrust magnitude parameters to prevent injection or simulation overflows
+  const parsedDeltaV = parseFloat(deltaV);
+  if (isNaN(parsedDeltaV) || parsedDeltaV <= 0 || parsedDeltaV > 100) {
+    return { status: "ERROR", message: "Invalid thrust vector magnitude. Must be a positive number under 100 m/s." };
+  }
+
   // Calculate altitude adjustment (1 m/s delta-v shifts orbit semi-major axis roughly by 1.8km in LEO)
   const shiftMultiplier = sat.alt > 1000 ? 15 : 1.8;
-  const altShift = deltaV * shiftMultiplier;
+  const altShift = parsedDeltaV * shiftMultiplier;
   
   if (!sat.burnAdjustments) sat.burnAdjustments = { alt: 0 };
   sat.burnAdjustments.alt += altShift;
