@@ -9,6 +9,7 @@ import { initSpaceWeather } from './components/space-weather.js';
 import { initTelemetryTerminal } from './components/telemetry-terminal.js';
 import { initAgentConsole } from './components/agent-console.js';
 import { initCollisionMonitor } from './components/collision-monitor.js';
+import { initGroundTrackMap, invalidateMapSize } from './components/ground-track.js';
 
 let socket = null;
 let useWebsocket = false;
@@ -87,9 +88,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   initTelemetryTerminal();
   initCollisionMonitor();
   initAgentConsole(socket, useWebsocket);
+  initGroundTrackMap();
 
   // 7.5. Bind Search and Filter Events
   bindSearchAndFilterEvents();
+  bindViewToggleEvents();
 
   // 8. Start local simulation clock loop
   // If WebSocket is active, SGP4 tick updates coordinates from the server.
@@ -330,5 +333,53 @@ function bindSearchAndFilterEvents() {
     if (e.key === 'Enter') {
       triggerCatalogSearch();
     }
+  });
+}
+
+function bindViewToggleEvents() {
+  const btn3D = document.getElementById('btn-toggle-3d');
+  const btn2D = document.getElementById('btn-toggle-2d');
+  const threeContainer = document.getElementById('three-container');
+  const leafletContainer = document.getElementById('leaflet-container');
+  const orbitControls = document.querySelector('.orbit-controls-hud');
+  const titleLabel = document.getElementById('lbl-tracker-title');
+
+  if (!btn3D || !btn2D || !threeContainer || !leafletContainer) return;
+
+  btn3D.addEventListener('click', () => {
+    if (btn3D.classList.contains('active')) return;
+    
+    btn3D.classList.add('active');
+    btn2D.classList.remove('active');
+    
+    threeContainer.style.display = 'block';
+    leafletContainer.style.display = 'none';
+    if (orbitControls) orbitControls.style.display = 'flex';
+    if (titleLabel) {
+      titleLabel.innerHTML = '<i data-lucide="globe" style="width: 16px; height: 16px;"></i> 3D Space Domain Map';
+      lucide.createIcons();
+    }
+    
+    audio.playClick();
+  });
+
+  btn2D.addEventListener('click', () => {
+    if (btn2D.classList.contains('active')) return;
+    
+    btn2D.classList.add('active');
+    btn3D.classList.remove('active');
+    
+    threeContainer.style.display = 'none';
+    leafletContainer.style.display = 'block';
+    if (orbitControls) orbitControls.style.display = 'none';
+    if (titleLabel) {
+      titleLabel.innerHTML = '<i data-lucide="map" style="width: 16px; height: 16px;"></i> 2D Ground Track Map';
+      lucide.createIcons();
+    }
+    
+    // Force Leaflet map layout calculation once container displays
+    invalidateMapSize();
+    
+    audio.playClick();
   });
 }

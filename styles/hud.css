@@ -648,3 +648,118 @@
 .sat-details-val.normal { color: hsl(var(--color-green)); }
 .sat-details-val.warning { color: hsl(var(--color-amber)); }
 .sat-details-val.danger { color: hsl(var(--color-red)); }
+
+/* Cyber Leaflet Map overrides */
+.leaflet-container {
+  background: #05050d !important;
+  font-family: var(--font-sans) !important;
+}
+
+/* Custom DivIcon Glowing Station Marker */
+.custom-station-icon {
+  background: transparent;
+  border: none;
+}
+
+.station-marker-pulse {
+  width: 10px;
+  height: 10px;
+  background-color: hsl(var(--color-cyan));
+  border-radius: 50%;
+  box-shadow: 0 0 8px hsl(var(--color-cyan));
+  position: relative;
+  display: block;
+  margin: -5px 0 0 -5px;
+}
+
+.station-marker-pulse::after {
+  content: '';
+  width: 24px;
+  height: 24px;
+  border: 1px solid hsl(var(--color-cyan), 0.5);
+  border-radius: 50%;
+  position: absolute;
+  top: -7px;
+  left: -7px;
+  animation: pulse-ring 1.8s infinite ease-out;
+  opacity: 0;
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.3); opacity: 0.8; }
+  80%, 100% { transform: scale(1.5); opacity: 0; }
+}
+
+/* Sub-Satellite Glowing Marker */
+.custom-sat-icon {
+  background: transparent;
+  border: none;
+}
+
+.sat-marker-pulse {
+  width: 12px;
+  height: 12px;
+  background-color: hsl(var(--color-green));
+  border-radius: 50%;
+  box-shadow: 0 0 10px hsl(var(--color-green));
+  position: relative;
+  display: block;
+  margin: -6px 0 0 -6px;
+}
+
+.sat-marker-pulse.danger {
+  background-color: hsl(var(--color-red));
+  box-shadow: 0 0 10px hsl(var(--color-red));
+  animation: pulse-red-ring 1.2s infinite ease-in-out;
+}
+
+.sat-marker-pulse.warning {
+  background-color: hsl(var(--color-amber));
+  box-shadow: 0 0 10px hsl(var(--color-amber));
+}
+
+@keyframes pulse-red-ring {
+  0% { box-shadow: 0 0 5px hsl(var(--color-red)); }
+  50% { box-shadow: 0 0 15px hsl(var(--color-red)); }
+  100% { box-shadow: 0 0 5px hsl(var(--color-red)); }
+}
+
+/* Dark Cyber Leaflet Popup overrides */
+.leaflet-popup-content-wrapper {
+  background: rgba(8, 12, 24, 0.9) !important;
+  border: 1px solid hsl(var(--color-cyan), 0.3) !important;
+  border-radius: 4px !important;
+  color: #cbd5e1 !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.7rem !important;
+  box-shadow: var(--glow-cyan) !important;
+  backdrop-filter: blur(8px) !important;
+  padding: 4px !important;
+}
+
+.leaflet-popup-content {
+  margin: 8px 12px !important;
+  line-height: 1.5 !important;
+}
+
+.leaflet-popup-tip {
+  background: rgba(8, 12, 24, 0.9) !important;
+  border-left: 1px solid hsl(var(--color-cyan), 0.3) !important;
+  border-bottom: 1px solid hsl(var(--color-cyan), 0.3) !important;
+}
+
+.leaflet-popup-close-button {
+  color: hsl(var(--color-cyan)) !important;
+  padding: 6px 8px 0 0 !important;
+}
+
+.leaflet-popup-title {
+  font-family: var(--font-hud) !important;
+  font-size: 0.75rem !important;
+  color: #fff !important;
+  font-weight: 700;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  text-transform: uppercase;
+}

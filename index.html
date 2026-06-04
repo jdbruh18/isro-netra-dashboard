@@ -7,6 +7,7 @@
   <meta name="description" content="AI-Powered Space Domain Awareness and Gaganyaan Mission Trajectory Tracker - ISRO NETRA Control Center.">
   <link rel="stylesheet" href="styles/main.css">
   <link rel="stylesheet" href="styles/hud.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
   <!-- Cyber Scanline Effect -->
@@ -119,21 +120,31 @@
       <!-- Center Panel: 3D Orbital Canvas -->
       <section class="hud-panel panel-orbits" id="panel-orbital-tracker">
         <div class="panel-header">
-          <h2 class="panel-title">
-            <i data-lucide="globe" style="width: 16px; height: 16px;"></i>
-            3D Space Domain Map (SGP4 Propagation)
-          </h2>
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <h2 class="panel-title" id="lbl-tracker-title">
+              <i data-lucide="globe" style="width: 16px; height: 16px;"></i>
+              3D Space Domain Map
+            </h2>
+            <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.3); padding: 2px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05); flex-shrink: 0;">
+              <button class="panel-action active" id="btn-toggle-3d" style="font-size: 0.6rem; padding: 2px 6px;">3D GLOBE</button>
+              <button class="panel-action" id="btn-toggle-2d" style="font-size: 0.6rem; padding: 2px 6px;">2D TRACK</button>
+            </div>
+          </div>
           <div style="font-family: var(--font-mono); font-size: 0.65rem; color: #64748b;">
             Propagation: <span style="color: hsl(var(--color-cyan));" id="lbl-propagation-mode">satellite.js (SGP4)</span>
           </div>
         </div>
         
-        <!-- Three.js Canvas Container -->
+        <!-- Maps View Workspace -->
         <div style="flex: 1; position: relative;">
-          <div id="three-container" style="width:100%; height:100%; position:absolute;"></div>
+          <!-- Three.js Canvas Container -->
+          <div id="three-container" style="width:100%; height:100%; position:absolute; z-index: 2;"></div>
+          
+          <!-- Leaflet Map Container -->
+          <div id="leaflet-container" style="width:100%; height:100%; position:absolute; display:none; z-index: 1; background: #05050d;"></div>
           
           <!-- Orbit View Control Buttons overlay -->
-          <div class="orbit-controls-hud">
+          <div class="orbit-controls-hud" style="z-index: 10;">
             <button id="btn-camera-reset" class="hud-btn">
               <i data-lucide="refresh-cw" style="width: 12px; height: 12px;"></i>
               Reset Camera
@@ -268,6 +279,7 @@
   <!-- CDN scripts -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/satellite.js/4.0.0/satellite.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   
   <!-- App Script Entrypoint -->
