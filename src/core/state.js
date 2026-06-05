@@ -22,6 +22,7 @@ class StateStore {
       },
       telemetryLogs: [],
       agentLogs: [],
+      activeConjunctions: [],
       simTime: new Date(),
       alarmActive: false
     };

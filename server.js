@@ -421,6 +421,10 @@ app.post('/api/gemini', async (req, res) => {
             }
           },
           {
+            name: "get_active_conjunctions",
+            description: "Fetch current active satellite-on-debris conjunctions including miss distances, risk categories, and target IDs."
+          },
+          {
             name: "get_anomaly_diagnostics",
             description: "Fetch real-time micro-telemetry diagnostic variables (battery thermals, solar panel efficiency, communication signal quality, propellant pressure) to scan for space weather induced anomalies."
           },
@@ -449,9 +453,9 @@ app.post('/api/gemini', async (req, res) => {
 You monitor Indian satellites (including Gaganyaan-1, Cartosat-3, NavIC constellation) and debris alerts.
 You understand the "butterfly effect" of solar activity on spacecraft subsystems.
 When the user asks you questions, requests checks, or coordinates maneuvers:
-1. First, query 'get_satellite_states' to review coordinates and danger flags.
+1. First, query 'get_satellite_states' to review coordinates and threat levels, and query 'get_active_conjunctions' to inspect active satellite proximity danger corridors.
 2. Call 'get_anomaly_diagnostics' to fetch the real-time health telemetry variables (thermals, SNR, voltage) of active satellites. If any systems are degraded (battery temp > 45°C or comms SNR < 12dB), report these specific anomalies to the operator and analyze how they correlate with the active solar weather.
-3. If any satellite has a threat level of 'WARNING' or 'DANGER', run 'calculate_avoidance_vector' to get orbital thrust metrics.
+3. If any satellite is flagged in the active conjunction corridors list, run 'calculate_avoidance_vector' to get orbital thrust metrics for that target satellite.
 4. Before calling 'execute_orbital_burn' to execute a burn, you MUST consult the Aditya Solar Physics Analyst using the 'consult_solar_physics_analyst' tool to check space weather safety.
 5. If the Analyst reports status 'ABORT', or if critical spacecraft anomalies (like battery temp > 48°C) render the electronics too sensitive for thrust ignition, abort the maneuver. Explain the solar storm / ESD radiation hazard details to the operator and do NOT call 'execute_orbital_burn'.
 6. If the Analyst reports status 'CLEAR' and spacecraft thermals/systems are stable, proceed with calling 'execute_orbital_burn' to execute the maneuver.
@@ -493,6 +497,49 @@ Format your final response in clear, concise markdown with appropriate headers. 
             health: s.health || { solarV: 32.4, battTemp: 28.5, downlinkSNR: 24.5, fuelPressure: 220 }
           }));
           toolResult = { diagnostics };
+        } else if (name === "get_active_conjunctions") {
+          const activeSats = serverTelemetry.satellites.filter(s => s.category !== 'debris');
+          const debrisSats = serverTelemetry.satellites.filter(s => s.category === 'debris');
+          const conjunctions = [];
+          
+          activeSats.forEach(activeSat => {
+            debrisSats.forEach(debrisSat => {
+              const rad = (Math.PI / 180);
+              const earthRadius = 6378.137;
+              
+              const lat1 = (activeSat.lat || 0) * rad;
+              const lng1 = (activeSat.lng || 0) * rad;
+              const r1 = earthRadius + (activeSat.alt || 0);
+              const x1 = r1 * Math.cos(lat1) * Math.cos(lng1);
+              const y1 = r1 * Math.cos(lat1) * Math.sin(lng1);
+              const z1 = r1 * Math.sin(lat1);
+
+              const lat2 = (debrisSat.lat || 0) * rad;
+              const lng2 = (debrisSat.lng || 0) * rad;
+              const r2 = earthRadius + (debrisSat.alt || 0);
+              const x2 = r2 * Math.cos(lat2) * Math.cos(lng2);
+              const y2 = r2 * Math.cos(lat2) * Math.sin(lng2);
+              const z2 = r2 * Math.sin(lat2);
+
+              const dx = x1 - x2;
+              const dy = y1 - y2;
+              const dz = z1 - z2;
+              const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+              
+              if (dist < 350) {
+                conjunctions.push({
+                  activeId: activeSat.id,
+                  activeName: activeSat.name,
+                  debrisId: debrisSat.id,
+                  debrisName: debrisSat.name,
+                  distanceKm: dist,
+                  probability: 100 * Math.exp(-dist / 120),
+                  dangerLevel: dist < 150 ? 'DANGER' : 'WARNING'
+                });
+              }
+            });
+          });
+          toolResult = { conjunctions };
         } else if (name === "consult_solar_physics_analyst") {
           const weather = serverTelemetry.spaceWeather;
           let analystResult = null;
@@ -613,9 +660,20 @@ setInterval(() => {
   const weather = serverTelemetry.spaceWeather;
   const isStorm = weather.solarProtonFlux > 15.0 || weather.kpIndex >= 4.5;
 
-  // Simulates small movements or tracks real SGP4 values when frontend streams them
-  // Keep values updated inside server memory
   serverTelemetry.satellites.forEach(s => {
+    if (s.lat === undefined || s.lat === null || isNaN(s.lat)) {
+      s.lat = 10.0 + Math.random() * 20.0;
+    }
+    if (s.lng === undefined || s.lng === null || isNaN(s.lng)) {
+      s.lng = Math.random() * 180.0;
+    }
+    if (s.alt === undefined || s.alt === null || isNaN(s.alt)) {
+      s.alt = s.category === 'debris' ? 405.0 : 450.0;
+    }
+    if (s.velocity === undefined || s.velocity === null || isNaN(s.velocity)) {
+      s.velocity = 7.6;
+    }
+
     if (s.id !== 'cosmos-debris') {
       s.lng = (s.lng + 0.05) % 180;
     } else {
@@ -671,6 +729,52 @@ setInterval(() => {
         if (s.alt < 100) s.alt = 100;
       }
     }
+  });
+
+  // Reset threat level of all satellites to NORMAL first
+  serverTelemetry.satellites.forEach(s => {
+    s.threatLevel = "NORMAL";
+    s.threatDetails = "Normal orbital operations.";
+  });
+
+  // Calculate active conjunctions and set threat levels dynamically
+  const activeSats = serverTelemetry.satellites.filter(s => s.category !== 'debris');
+  const debrisSats = serverTelemetry.satellites.filter(s => s.category === 'debris');
+
+  activeSats.forEach(activeSat => {
+    debrisSats.forEach(debrisSat => {
+      const rad = (Math.PI / 180);
+      const earthRadius = 6378.137;
+      
+      const lat1 = (activeSat.lat || 0) * rad;
+      const lng1 = (activeSat.lng || 0) * rad;
+      const r1 = earthRadius + (activeSat.alt || 0);
+      const x1 = r1 * Math.cos(lat1) * Math.cos(lng1);
+      const y1 = r1 * Math.cos(lat1) * Math.sin(lng1);
+      const z1 = r1 * Math.sin(lat1);
+
+      const lat2 = (debrisSat.lat || 0) * rad;
+      const lng2 = (debrisSat.lng || 0) * rad;
+      const r2 = earthRadius + (debrisSat.alt || 0);
+      const x2 = r2 * Math.cos(lat2) * Math.cos(lng2);
+      const y2 = r2 * Math.cos(lat2) * Math.sin(lng2);
+      const z2 = r2 * Math.sin(lat2);
+
+      const dx = x1 - x2;
+      const dy = y1 - y2;
+      const dz = z1 - z2;
+      const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+      
+      if (dist < 350) {
+        const dangerLevel = dist < 150 ? 'DANGER' : 'WARNING';
+        
+        activeSat.threatLevel = dangerLevel;
+        activeSat.threatDetails = `Conjunction danger with ${debrisSat.name}. Distance: ${dist.toFixed(1)} km.`;
+        
+        debrisSat.threatLevel = dangerLevel;
+        debrisSat.threatDetails = `Intersection route with ${activeSat.name}. Distance: ${dist.toFixed(1)} km.`;
+      }
+    });
   });
   
   // Tick weather parameters inside server memory

@@ -189,77 +189,138 @@ function renderAssetList(sats) {
 }
 
 function analyzeConjunctionRisks(sats) {
-  const gaganyaan = sats.find(s => s.id === 'gaganyaan');
-  const debris = sats.find(s => s.id === 'cosmos-debris');
+  // 1. Reset threat markers for all satellites
+  sats.forEach(s => {
+    s.threatLevel = 'NORMAL';
+    s.threatDetails = 'Telemetry synchronized.';
+  });
 
-  if (!gaganyaan || !debris || !gaganyaan.lat || !debris.lat) {
-    clearConjunctionWarning();
+  const activeSats = sats.filter(s => s.category !== 'debris');
+  const debrisSats = sats.filter(s => s.category === 'debris');
+  const conjunctions = [];
+
+  activeSats.forEach(activeSat => {
+    debrisSats.forEach(debrisSat => {
+      if (activeSat.position3d && debrisSat.position3d) {
+        const dx = activeSat.position3d.x - debrisSat.position3d.x;
+        const dy = activeSat.position3d.y - debrisSat.position3d.y;
+        const dz = activeSat.position3d.z - debrisSat.position3d.z;
+        const distanceScaled = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        
+        // Scale back to physical kilometers
+        const distanceKm = distanceScaled * 1275.6;
+
+        if (distanceKm < 350) {
+          const dangerLevel = distanceKm < 150 ? 'DANGER' : 'WARNING';
+          
+          // Set threat markers
+          activeSat.threatLevel = dangerLevel;
+          activeSat.threatDetails = `Conjunction danger with ${debrisSat.name}. Distance: ${distanceKm.toFixed(1)} km.`;
+          
+          // Also set on debris for visual coloring of both rows in the list
+          debrisSat.threatLevel = dangerLevel;
+          debrisSat.threatDetails = `Intersection route with ${activeSat.name}. Distance: ${distanceKm.toFixed(1)} km.`;
+
+          // Threat probability calculation: P = 100 * e^(-dist / 120)
+          const probability = 100 * Math.exp(-distanceKm / 120);
+
+          conjunctions.push({
+            activeId: activeSat.id,
+            activeName: activeSat.name,
+            debrisId: debrisSat.id,
+            debrisName: debrisSat.name,
+            distance: distanceKm,
+            probability: probability,
+            dangerLevel: dangerLevel
+          });
+
+          // Log warning alerts periodically (approx. once every 15 ticks)
+          if (Math.random() < 0.08) {
+            store.addLog(`[ALERT-NETRA] Proximity warning for ${activeSat.name} and ${debrisSat.name}. Miss distance: ${distanceKm.toFixed(1)} km.`, 'danger');
+          }
+        }
+      }
+    });
+  });
+
+  // Update global state store activeConjunctions
+  store.state.activeConjunctions = conjunctions;
+  renderConjunctionMatrix(conjunctions);
+}
+
+function renderConjunctionMatrix(conjunctions) {
+  const container = document.getElementById('conjunction-list-container');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (conjunctions.length === 0) {
+    container.innerHTML = `
+      <div class="alert-card warning-only" style="background: rgba(74, 222, 128, 0.05); border-color: rgba(74, 222, 128, 0.3); display: flex; flex-direction: column;">
+        <div class="alert-card-header">
+          <span class="alert-card-title" style="color: hsl(var(--color-green)); text-shadow: 0 0 6px hsl(var(--color-green));">CORRIDORS SECURE</span>
+          <i data-lucide="shield" style="width: 14px; height: 14px; color: hsl(var(--color-green));"></i>
+        </div>
+        <span class="alert-card-desc">All orbital paths verified. No conjunction risks detected in monitoring corridors.</span>
+      </div>
+    `;
+    lucide.createIcons();
+    // Stop alarm sound if active
+    const alertsPanel = document.getElementById('panel-alerts-weather');
+    if (alertsPanel) alertsPanel.className = 'hud-panel';
+    audio.stopAlarm();
     return;
   }
 
-  // Calculate coordinates distance in 3D (scaled units)
-  // Or compute great-circle distance + altitude difference.
-  // In our propagator, scale is 5 units = 6378.1 km (Earth radius)
-  if (gaganyaan.position3d && debris.position3d) {
-    const dx = gaganyaan.position3d.x - debris.position3d.x;
-    const dy = gaganyaan.position3d.y - debris.position3d.y;
-    const dz = gaganyaan.position3d.z - debris.position3d.z;
-    const distanceScaled = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    
-    // Scale back to physical kilometers
-    const distanceKm = distanceScaled * 1275.6;
+  let hasDanger = false;
 
-    // Check collision danger: Threshold is 350km for initial warnings, 150km for critical red alert
-    if (distanceKm < 350) {
-      const dangerLevel = distanceKm < 150 ? 'DANGER' : 'WARNING';
-      
-      // Update global threat markers on gaganyaan and debris
-      gaganyaan.threatLevel = dangerLevel;
-      gaganyaan.threatDetails = `Conjunction danger with Cosmos-1408 fragment. Distance: ${distanceKm.toFixed(1)} km.`;
-      
-      // Trigger warning UI card styling
-      alertCard.style.display = 'flex';
-      
-      if (dangerLevel === 'DANGER') {
-        alertCard.className = 'alert-card animate-pulse-red';
-        alertCard.querySelector('.alert-card-title').textContent = 'CRITICAL CONJUNCTION RED ALERT';
-        document.getElementById('panel-alerts-weather').className = 'hud-panel alert-active';
-        
-        // If alarm enabled, start siren audio
-        if (store.getState().alarmActive) {
-          audio.startAlarm();
-        }
-      } else {
-        alertCard.className = 'alert-card warning-only';
-        alertCard.querySelector('.alert-card-title').textContent = 'GEOMETRIC CORRIDOR WARNING';
-        document.getElementById('panel-alerts-weather').className = 'hud-panel';
-      }
+  conjunctions.forEach(c => {
+    const isDanger = c.dangerLevel === 'DANGER';
+    if (isDanger) hasDanger = true;
 
-      detailsLabel.textContent = `Gaganyaan-1 intersects Debris corridor. Proximity: ${distanceKm.toFixed(1)} km. Relative speed: 7.68 km/s. Intersection in under 4 mins.`;
-      
-      // Calculate recommended Delta-V (closer = higher delta-v required to shift orbit enough)
-      const reqDeltaV = distanceKm < 150 ? 1.85 : 1.45;
-      solutionLabel.textContent = `PROGRADE thrust: Delta-V ${reqDeltaV} m/s. Raise orbit by +${(reqDeltaV * 1.8).toFixed(1)} km.`;
-      
-      // Log alert warning periodically to terminal (once every 15 seconds to prevent spam)
-      if (Math.random() < 0.08) {
-        store.addLog(`[ALERT-NETRA] Collision threat detected. Proximity: ${distanceKm.toFixed(1)} km. Mitigation recommended.`, 'danger');
+    const reqDeltaV = isDanger ? 1.85 : 1.45;
+    const cardClass = isDanger ? 'alert-card animate-pulse-red' : 'alert-card warning-only';
+    const alertTitle = isDanger ? 'CRITICAL CONJUNCTION ALERT' : 'GEOMETRIC PROXIMITY WARNING';
+    const iconName = isDanger ? 'alert-triangle' : 'alert-circle';
+    const iconColor = isDanger ? 'hsl(var(--color-red))' : 'hsl(var(--color-amber))';
+
+    const card = document.createElement('div');
+    card.className = cardClass;
+    card.style.display = 'flex';
+    card.style.flexDirection = 'column';
+    card.innerHTML = `
+      <div class="alert-card-header">
+        <span class="alert-card-title">${alertTitle}</span>
+        <i data-lucide="${iconName}" style="width: 14px; height: 14px; color: ${iconColor};"></i>
+      </div>
+      <div class="alert-card-desc">
+        <strong>${c.activeName}</strong> approaching <strong>${c.debrisName}</strong>.<br/>
+        Proximity: <span style="font-family: var(--font-mono); color: #fff;">${c.distance.toFixed(1)} km</span> | 
+        Threat Score: <span style="font-family: var(--font-mono); color: ${iconColor};">${c.probability.toFixed(1)}%</span>
+      </div>
+      <div class="ai-suggestion-box" style="margin-top: 6px; padding: 6px 10px;">
+        <div class="ai-suggestion-title">Mitigation Vector</div>
+        <div class="ai-suggestion-body" style="font-size: 0.65rem;">
+          Recommend: Delta-V ${reqDeltaV} m/s PROGRADE burn. Alt shift: +${(reqDeltaV * 1.8).toFixed(1)} km.
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  lucide.createIcons();
+
+  // Set the panel container highlight
+  const alertsPanel = document.getElementById('panel-alerts-weather');
+  if (alertsPanel) {
+    if (hasDanger) {
+      alertsPanel.className = 'hud-panel alert-active';
+      if (store.getState().alarmActive) {
+        audio.startAlarm();
       }
     } else {
-      clearConjunctionWarning();
+      alertsPanel.className = 'hud-panel';
+      audio.stopAlarm();
     }
-  } else {
-    clearConjunctionWarning();
-  }
-}
-
-function clearConjunctionWarning() {
-  if (alertCard) {
-    alertCard.style.display = 'none';
-    document.getElementById('panel-alerts-weather').className = 'hud-panel';
-    solutionLabel.textContent = 'Operational corridors clear. No thrust required.';
-    
-    // Stop siren
-    audio.stopAlarm();
   }
 }

@@ -169,11 +169,15 @@ async function queryGeminiAgent(message, typingId) {
     if (lower.includes('status') || lower.includes('diagnose') || lower.includes('check') || lower.includes('anomaly')) {
       const sats = store.getState().satellites;
       const weather = store.getState().spaceWeather;
-      const dangerous = sats.find(s => s.threatLevel === 'WARNING');
+      const activeConjunctions = store.getState().activeConjunctions;
       
       // Simulate Gemini calling get_satellite_states
       store.addAgentLog("get_satellite_states", {}, { satellites: sats });
       store.addLog("[GEMINI-AGENT] Tool Call: get_satellite_states()", 'ai');
+
+      // Simulate Gemini calling get_active_conjunctions
+      store.addAgentLog("get_active_conjunctions", {}, { conjunctions: activeConjunctions });
+      store.addLog("[GEMINI-AGENT] Tool Call: get_active_conjunctions()", 'ai');
 
       // Simulate Gemini calling get_anomaly_diagnostics
       const diagnostics = sats.map(s => ({
@@ -188,75 +192,92 @@ async function queryGeminiAgent(message, typingId) {
       const anomalousSat = sats.find(s => s.health && s.id !== 'cosmos-debris' && (s.health.battTemp > 45.0 || s.health.downlinkSNR < 12.0));
 
       if (anomalousSat && isStorm) {
-        reply = `**A.E.G.I.S. Space Operations Diagnostic Report**\n\nI ran full telemetry checks and detected severe solar storm induced anomalies (the Butterfly Effect):\n\n- **Space Asset**: ${anomalousSat.name}\n- **Subsystem Anomalies**:\n  - Battery Temperature: **${anomalousSat.health.battTemp.toFixed(1)}°C** (Geomagnetically Induced Currents warming - CRITICAL)\n  - Communication Downlink SNR: **${anomalousSat.health.downlinkSNR.toFixed(1)} dB** (Ionospheric Scintillation interference)\n  - Solar Panel Voltage: **${anomalousSat.health.solarV.toFixed(1)} V** (Proton charge scramble)\n\n- **Conjunction Danger**: ${dangerous ? `YES - threat corridor intersect with ${dangerous.name}` : 'NO - orbital corridor clear'}\n\n**Recommendation**: Defer thruster maneuver uplinks immediately. Firing thrusters while the batteries are in thermal warning risks static breakdown. Initiate radiation shielding recovery.`;
-      } else if (dangerous) {
-        reply = `**A.E.G.I.S. Space Intelligence Report**\n\nI executed telemetry checks. Subsystems are stable, but a conjunction warning is active:\n- Target: **Gaganyaan Crew Module**\n- Intersector: **${dangerous.name}**\n- Status: **DANGER**\n\nSpace weather is CLEAR. I recommend executing an evasive burn. Ask me to: **"evade collision"** to steer Gaganyaan.`;
+        reply = `**A.E.G.I.S. Space Operations Diagnostic Report**\n\nI ran full telemetry checks and detected severe solar storm induced anomalies (the Butterfly Effect):\n\n- **Space Asset**: ${anomalousSat.name}\n- **Subsystem Anomalies**:\n  - Battery Temperature: **${anomalousSat.health.battTemp.toFixed(1)}°C** (Induced currents alert)\n  - Communication Downlink SNR: **${anomalousSat.health.downlinkSNR.toFixed(1)} dB** (Ionospheric Scintillation)\n\n- **Conjunction Corridor Alerts**: ${activeConjunctions.length > 0 ? `${activeConjunctions.length} threats active (e.g. ${activeConjunctions[0].activeName} near ${activeConjunctions[0].debrisName})` : 'NO - paths clear'}\n\n**Recommendation**: Defer thruster burn sequence. Firing thrusters while systems are experiencing ESD and battery thermal spikes risks electronic failure.`;
+      } else if (activeConjunctions.length > 0) {
+        const topConjunction = activeConjunctions[0];
+        reply = `**A.E.G.I.S. Space Intelligence Report**\n\nI executed telemetry checks. Subsystems are stable, but dynamic conjunction warnings are active:\n\n- **Spacecraft**: ${topConjunction.activeName}\n- **Intersector**: ${topConjunction.debrisName}\n- **Miss Distance**: **${topConjunction.distance.toFixed(1)} km**\n- **Risk Score (Probability)**: **${topConjunction.probability.toFixed(1)}%**\n- **Threat Level**: **${topConjunction.dangerLevel}**\n\nSpace weather is CLEAR. I recommend executing an evasive burn. Ask me to: **"evade collision"** to steer ${topConjunction.activeName}.`;
       } else {
-        reply = `**A.E.G.I.S. Space Intelligence Report**\n\nAll space assets are verified healthy. Subsystem parameters (voltage, thermals, comms link) are stable. Solar weather is QUIET.`;
+        reply = `**A.E.G.I.S. Space Intelligence Report**\n\nAll space assets are verified healthy. Subsystem parameters are stable and all orbital monitoring corridors are CLEAR.`;
       }
     } 
     
     else if (lower.includes('avoid') || lower.includes('evade') || lower.includes('burn') || lower.includes('collision')) {
+      const activeConjunctions = store.getState().activeConjunctions;
       const sats = store.getState().satellites;
       const weather = store.getState().spaceWeather;
-      const gaganyaan = sats.find(s => s.id === 'gaganyaan');
-      const debris = sats.find(s => s.id === 'cosmos-debris');
 
       // 1. Call get_satellite_states tool
       store.addAgentLog("get_satellite_states", {}, { satellites: sats });
       store.addLog("[GEMINI-AGENT] Tool Call: get_satellite_states()", 'ai');
 
-      // 2. Call calculate_avoidance_vector tool
-      store.addAgentLog("calculate_avoidance_vector", { satelliteId: "gaganyaan" }, {
-        satelliteId: "gaganyaan",
-        recommendedDeltaV: 1.45,
-        recommendedDirection: "PROGRADE",
-        estimatedOrbitalShiftKm: 2.61
-      });
-      store.addLog("[GEMINI-AGENT] Tool Call: calculate_avoidance_vector(gaganyaan)", 'ai');
+      // 2. Call get_active_conjunctions tool
+      store.addAgentLog("get_active_conjunctions", {}, { conjunctions: activeConjunctions });
+      store.addLog("[GEMINI-AGENT] Tool Call: get_active_conjunctions()", 'ai');
 
-      // 3. Call consult_solar_physics_analyst tool
-      const isStorm = weather.solarProtonFlux > 15.0 || weather.kpIndex >= 4.5;
-      const analystResult = {
-        satelliteId: "gaganyaan",
-        status: isStorm ? "ABORT" : "CLEAR",
-        reasoning: isStorm
-          ? `Aditya-L1 PAPA instrument reports elevated Solar Proton Flux is ${weather.solarProtonFlux.toFixed(1)} pfu (Threshold: 15.0 pfu). Elevated radiation danger corridor.`
-          : `Solar Proton Flux is stable at ${weather.solarProtonFlux.toFixed(1)} pfu. Telemetry channels clear.`,
-        recommendation: isStorm
-          ? "ABORT: Defer thruster operations to avoid telemetry scintillation and ESD static charge buildup."
-          : "CLEAR: Space weather parameters normal. Thruster ignition authorized."
-      };
-      
-      store.addAgentLog("consult_solar_physics_analyst", { satelliteId: "gaganyaan" }, analystResult);
-      store.addLog("[GEMINI-AGENT] Tool Call: consult_solar_physics_analyst(gaganyaan)", 'ai');
-
-      if (isStorm) {
-        reply = `**Mitigation Blocked (Space Weather Consensus)**\n\nI initiated threat mitigation protocols, but the **Aditya Solar Physics Analyst** returned an **ABORT** status:\n\n* **Reasoning**: ${analystResult.reasoning}\n* **Recommendation**: ${analystResult.recommendation}\n\n**Decision**: The thruster burn sequence for **Gaganyaan-1** has been aborted. Operations room is advised to delay maneuvers until the proton flux storm subsides and solar wind speed stabilizes. Active radiation shielding controls enabled.`;
+      if (activeConjunctions.length === 0) {
+        reply = `**Mitigation Blocked**\n\nActive conjunction analysis shows no spacecraft in danger corridors. No evasive thrust maneuvers are required.`;
       } else {
-        // 4. Call execute_orbital_burn tool
-        const shiftMultiplier = 1.8;
-        const altShift = 1.45 * shiftMultiplier;
-        
-        if (gaganyaan) {
-          if (!gaganyaan.burnAdjustments) gaganyaan.burnAdjustments = { alt: 0 };
-          gaganyaan.burnAdjustments.alt += altShift;
-          gaganyaan.alt += altShift;
-          gaganyaan.threatLevel = 'NORMAL';
-          gaganyaan.threatDetails = 'Orbit raised. Space debris cleared.';
-        }
-        if (debris) {
-          debris.threatLevel = 'NORMAL';
-          debris.threatDetails = 'Maneuver executed. Collision risk mitigated.';
-        }
-        
-        store.updateState('satellites', [...sats]);
-        
-        store.addAgentLog("execute_orbital_burn", { satelliteId: "gaganyaan", deltaV: 1.45, direction: "PROGRADE" }, { status: "SUCCESS" });
-        store.addLog(`[UPLINK] Maneuver executed: PROGRADE burn of 1.45 m/s. Orbit adjusted by +${altShift.toFixed(2)}km. (Gemini Local Simulation)`, 'success');
-        audio.playSuccess();
+        const topConjunction = activeConjunctions[0];
+        const targetSat = sats.find(s => s.id === topConjunction.activeId);
 
-        reply = `**Collision Shield Activated (Space Weather Consensus: CLEAR)**\n\nI initiated autonomous threat mitigation steps:\n1. Invoked \`calculate_avoidance_vector\` for **Gaganyaan-1**.\n2. Consulted **Aditya Solar Physics Analyst** (Solar flux: **${weather.solarProtonFlux.toFixed(1)} pfu** - Clear).\n3. Executed \`execute_orbital_burn\` with a **1.45 m/s PROGRADE** vector.\n4. Gaganyaan orbit raised by **+2.61 km**.\n\nDownlink signals verify the conjunction alert has cleared and the crew capsule is back in a safe orbital corridor.`;
+        // 3. Call calculate_avoidance_vector tool
+        const isLeo = targetSat ? targetSat.alt < 1000 : true;
+        const reqDeltaV = topConjunction.dangerLevel === 'DANGER' ? 1.85 : 1.45;
+        const shiftKm = reqDeltaV * (isLeo ? 1.8 : 15);
+
+        store.addAgentLog("calculate_avoidance_vector", { satelliteId: topConjunction.activeId }, {
+          satelliteId: topConjunction.activeId,
+          recommendedDeltaV: reqDeltaV,
+          recommendedDirection: "PROGRADE",
+          estimatedOrbitalShiftKm: shiftKm
+        });
+        store.addLog(`[GEMINI-AGENT] Tool Call: calculate_avoidance_vector(${topConjunction.activeId})`, 'ai');
+
+        // 4. Call consult_solar_physics_analyst tool
+        const isStorm = weather.solarProtonFlux > 15.0 || weather.kpIndex >= 4.5;
+        const analystResult = {
+          satelliteId: topConjunction.activeId,
+          status: isStorm ? "ABORT" : "CLEAR",
+          reasoning: isStorm
+            ? `Aditya-L1 PAPA instrument reports elevated Solar Proton Flux is ${weather.solarProtonFlux.toFixed(1)} pfu (Threshold: 15.0 pfu).`
+            : `Solar Proton Flux is stable at ${weather.solarProtonFlux.toFixed(1)} pfu.`,
+          recommendation: isStorm
+            ? "ABORT: Defer thruster operations to avoid telemetry scintillation and ESD static charge buildup."
+            : "CLEAR: Space weather parameters normal. Thruster ignition authorized."
+        };
+        
+        store.addAgentLog("consult_solar_physics_analyst", { satelliteId: topConjunction.activeId }, analystResult);
+        store.addLog(`[GEMINI-AGENT] Tool Call: consult_solar_physics_analyst(${topConjunction.activeId})`, 'ai');
+
+        if (isStorm) {
+          reply = `**Mitigation Blocked (Consensus: ABORT)**\n\nI initiated threat mitigation protocols for **${topConjunction.activeName}**, but the **Aditya Solar Physics Analyst** returned an **ABORT** status due to severe radiation conditions. Burn sequence terminated.`;
+        } else {
+          // 5. Call execute_orbital_burn tool
+          const altShift = shiftKm;
+          
+          if (targetSat) {
+            if (!targetSat.burnAdjustments) targetSat.burnAdjustments = { alt: 0 };
+            targetSat.burnAdjustments.alt += altShift;
+            targetSat.alt += altShift;
+            targetSat.threatLevel = 'NORMAL';
+            targetSat.threatDetails = 'Orbit raised. Space debris cleared.';
+          }
+          
+          // Clear active threat markings on the intersector debris as well
+          const debrisSat = sats.find(s => s.id === topConjunction.debrisId);
+          if (debrisSat) {
+            debrisSat.threatLevel = 'NORMAL';
+            debrisSat.threatDetails = 'Maneuver executed. Collision risk mitigated.';
+          }
+          
+          store.updateState('satellites', [...sats]);
+          
+          store.addAgentLog("execute_orbital_burn", { satelliteId: topConjunction.activeId, deltaV: reqDeltaV, direction: "PROGRADE" }, { status: "SUCCESS" });
+          store.addLog(`[UPLINK] Maneuver executed: PROGRADE burn of ${reqDeltaV} m/s. Orbit adjusted by +${altShift.toFixed(2)}km. (Gemini Local Simulation)`, 'success');
+          audio.playSuccess();
+
+          reply = `**Collision Shield Activated (Consensus: CLEAR)**\n\nI initiated autonomous threat mitigation steps for **${topConjunction.activeName}**:\n1. Invoked \`calculate_avoidance_vector\` (Recommended: **${reqDeltaV} m/s** PROGRADE).\n2. Consulted **Aditya Solar Physics Analyst** (Clear).\n3. Executed \`execute_orbital_burn\` on **${topConjunction.activeName}**.\n4. Orbit raised by **+${altShift.toFixed(2)} km**, successfully evading **${topConjunction.debrisName}**.`;
+        }
       }
     } 
     
@@ -285,16 +306,15 @@ async function executeClientSideGemini(message, apiKey) {
   const payload = {
     contents: contents,
     systemInstruction: {
-      parts: [{
-        text: `You are the ISRO NETRA Space Operations AI Commander at ISTRAC Bengaluru.
+      parts: [{        text: `You are the ISRO NETRA Space Operations AI Commander at ISTRAC Bengaluru.
 You monitor Indian satellites (including Gaganyaan-1, Cartosat-3, NavIC constellation) and debris alerts.
 You understand the "butterfly effect" of solar activity on spacecraft subsystems.
 When the user asks you questions, requests checks, or coordinates maneuvers:
-1. First, query 'get_satellite_states' to review coordinates and danger flags.
+1. First, query 'get_satellite_states' to review coordinates and threat levels, and query 'get_active_conjunctions' to inspect active satellite proximity danger corridors.
 2. Call 'get_anomaly_diagnostics' to fetch the real-time health telemetry variables (thermals, SNR, voltage) of active satellites. If any systems are degraded (battery temp > 45°C or comms SNR < 12dB), report these specific anomalies to the operator and analyze how they correlate with the active solar weather.
-3. If any satellite has a threat level of 'WARNING' or 'DANGER', run 'calculate_avoidance_vector' to get orbital thrust metrics.
+3. If any satellite is flagged in the active conjunction corridors list, run 'calculate_avoidance_vector' to get orbital thrust metrics for that target satellite.
 4. Before calling 'execute_orbital_burn' to execute a burn, you MUST consult the Aditya Solar Physics Analyst using the 'consult_solar_physics_analyst' tool to check space weather safety.
-5. If the Analyst reports status 'ABORT', or if critical spacecraft anomalies (like battery temp > 48°C) render the electronics too sensitive for thruster ignition, abort the maneuver. Explain the solar storm / ESD radiation hazard details to the operator and do NOT call 'execute_orbital_burn'.
+5. If the Analyst reports status 'ABORT', or if critical spacecraft anomalies (like battery temp > 48°C) render the electronics too sensitive for thrust ignition, abort the maneuver. Explain the solar storm / ESD radiation hazard details to the operator and do NOT call 'execute_orbital_burn'.
 6. If the Analyst reports status 'CLEAR' and spacecraft thermals/systems are stable, proceed with calling 'execute_orbital_burn' to execute the maneuver.
 7. Report your actions step-by-step, including the delta-v values, the Analyst weather consensus dialog, diagnosed subsystem anomalies, and altitude shifts.
 Format your final response in clear, concise markdown with appropriate headers. Keep it professional and military-grade.`
@@ -309,6 +329,10 @@ Format your final response in clear, concise markdown with appropriate headers. 
         {
           name: "get_space_weather",
           description: "Retrieve Aditya-L1 solar observatory sensor telemetry: Kp-index, solar flux, magnetometer (magX/Y/Z) readings, and storm levels."
+        },
+        {
+          name: "get_active_conjunctions",
+          description: "Fetch current active satellite-on-debris conjunctions including miss distances, risk categories, and target IDs."
         },
         {
           name: "get_anomaly_diagnostics",
@@ -381,6 +405,8 @@ Format your final response in clear, concise markdown with appropriate headers. 
       responseData = { satellites: sats };
     } else if (name === "get_space_weather") {
       responseData = { spaceWeather: weather };
+    } else if (name === "get_active_conjunctions") {
+      responseData = { conjunctions: store.getState().activeConjunctions };
     } else if (name === "get_anomaly_diagnostics") {
       const diagnostics = sats.map(s => ({
         id: s.id,

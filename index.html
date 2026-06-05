@@ -214,23 +214,9 @@
           <!-- Conjunction Risk Indicator -->
           <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 15px; margin-bottom: 5px;">Conjunction Alert Matrix</div>
           
-          <!-- Conjunction Warning Card -->
-          <div class="alert-card animate-pulse-red" id="card-conjunction-warning">
-            <div class="alert-card-header">
-              <span class="alert-card-title">CONJUNCTION COLLISION WARNING</span>
-              <i data-lucide="alert-triangle" style="width: 14px; height: 14px; color: hsl(var(--color-red));"></i>
-            </div>
-            <span class="alert-card-desc" id="lbl-conjunction-details">
-              Gaganyaan-1 approaching Cosmos-1408 Debris fragment. Distance: 254m. Velocity: 7.68 km/s.
-            </span>
-          </div>
-
-          <!-- AI Mitigation Burn Box -->
-          <div class="ai-suggestion-box">
-            <div class="ai-suggestion-title">AI Evacuation Solution</div>
-            <div class="ai-suggestion-body" id="lbl-ai-burn-solution">
-              Recommend: Delta-V 1.45 m/s | Radial-Out thrust.
-            </div>
+          <!-- Dynamic Conjunction Matrix Container -->
+          <div id="conjunction-list-container" style="display: flex; flex-direction: column; gap: 8px;">
+            <!-- Active conjunction alerts rendered dynamically -->
           </div>
         </div>
       </section>
