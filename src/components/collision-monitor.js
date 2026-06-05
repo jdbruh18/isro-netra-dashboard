@@ -155,6 +155,44 @@ function updateSatelliteDetails(sat) {
     setField(propEl, 'N/A');
     setField(fuelEl, 'N/A', 'sat-details-val');
   }
+
+  // Update Predictive failure diagnostics (V3.4)
+  const anomaliesEl = document.getElementById('sat-detail-active-anomalies');
+  const predThermalEl = document.getElementById('sat-detail-pred-thermal');
+  const predPowerEl = document.getElementById('sat-detail-pred-power');
+  const predReentryEl = document.getElementById('sat-detail-pred-reentry');
+
+  if (sat.anomalies) {
+    const active = sat.anomalies.activeList || [];
+    if (active.length === 0) {
+      setField(anomaliesEl, 'NONE', 'sat-details-val normal');
+    } else {
+      setField(anomaliesEl, active.join(', '), 'sat-details-val danger');
+    }
+
+    const formatPred = (sec) => {
+      if (sec === -1 || sec === Infinity || isNaN(sec)) return 'STABLE';
+      if (sec === 0) return 'EXCEEDED';
+      if (sec < 60) return `${sec.toFixed(0)}s`;
+      const mins = Math.floor(sec / 60);
+      const secs = Math.floor(sec % 60);
+      return `${mins}m ${secs}s`;
+    };
+
+    const pred = sat.anomalies.predictions || {};
+    const tTherm = pred.criticalThermalTimeSec;
+    const tPower = pred.batteryDepletionTimeSec;
+    const tReentry = pred.atmosphericReentryTimeSec;
+
+    setField(predThermalEl, formatPred(tTherm), (tTherm > -1 && tTherm <= 300) ? 'sat-details-val danger' : ((tTherm > -1 && tTherm <= 900) ? 'sat-details-val warning' : 'sat-details-val normal'));
+    setField(predPowerEl, formatPred(tPower), (tPower > -1 && tPower <= 120) ? 'sat-details-val danger' : ((tPower > -1 && tPower <= 600) ? 'sat-details-val warning' : 'sat-details-val normal'));
+    setField(predReentryEl, formatPred(tReentry), (tReentry > -1 && tReentry <= 1800) ? 'sat-details-val danger' : ((tReentry > -1 && tReentry <= 7200) ? 'sat-details-val warning' : 'sat-details-val normal'));
+  } else {
+    setField(anomaliesEl, 'N/A', 'sat-details-val');
+    setField(predThermalEl, 'N/A', 'sat-details-val');
+    setField(predPowerEl, 'N/A', 'sat-details-val');
+    setField(predReentryEl, 'N/A', 'sat-details-val');
+  }
 }
 
 function renderAssetList(sats) {

@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { initializeDb, getSatellites, saveSatellite, saveLog, saveAgentAction } from './db.js';
 import { validateBurn } from './src/core/avoidance-proof.js';
+import { validatePowerState, validateThrusterFuel, validateADCSState } from './src/core/subsystem-safety-proof.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -391,6 +392,29 @@ async function executeManeuver(satId, deltaV, direction, source = "Manual Contro
     return { status: "ERROR", message: "Maneuver blocked by Idris 2 verification: " + validation.error };
   }
 
+  // Enforce Idris 2 power grid state check
+  const powerValidation = validatePowerState(satId, sat.power ? sat.power.batterySoC : 100.0);
+  if (!powerValidation.success) {
+    return { status: "ERROR", message: "Maneuver blocked by Idris 2 power verification: " + powerValidation.error };
+  }
+
+  // Enforce Idris 2 thruster fuel & pressure check
+  const fuelValidation = validateThrusterFuel(
+    satId,
+    parsedDeltaV,
+    sat.propulsion ? sat.propulsion.propellantMassKg : 999.0,
+    sat.propulsion ? sat.propulsion.fuelPressurePsi : 200.0
+  );
+  if (!fuelValidation.success) {
+    return { status: "ERROR", message: "Maneuver blocked by Idris 2 fuel verification: " + fuelValidation.error };
+  }
+
+  // Deduct consumed propellant mass on successful maneuvers
+  if (sat.propulsion) {
+    const fuelConsumed = parsedDeltaV * 12.0; // 12 kg consumed per m/s delta-v
+    sat.propulsion.propellantMassKg = parseFloat(Math.max(0.0, sat.propulsion.propellantMassKg - fuelConsumed).toFixed(1));
+  }
+
   // Calculate altitude adjustment (1 m/s delta-v shifts orbit semi-major axis roughly by 1.8km in LEO)
   const shiftMultiplier = sat.alt > 1000 ? 15 : 1.8;
   const altShift = parsedDeltaV * shiftMultiplier;
@@ -638,6 +662,29 @@ app.post('/api/gemini', async (req, res) => {
             description: "Fetch real-time micro-telemetry diagnostic variables (battery thermals, solar panel efficiency, communication signal quality, propellant pressure) to scan for space weather induced anomalies."
           },
           {
+            name: "get_predictive_diagnostics",
+            description: "Retrieve active anomalies list and predictive time-to-failure forecasts (battery depletion, thermal limits, atmospheric reentry) for a given satellite.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                satelliteId: { type: "STRING", description: "Unique ID of the satellite (e.g. 'gaganyaan')." }
+              },
+              required: ["satelliteId"]
+            }
+          },
+          {
+            name: "validate_subsystem_state",
+            description: "Validate power grid state, thruster propellant reserves/pressure bounds, and ADCS slew/drift rates using the Idris 2 dependent verification engine.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                satelliteId: { type: "STRING", description: "Unique ID of the satellite (e.g. 'gaganyaan')." },
+                driftRate: { type: "NUMBER", description: "ADCS attitude drift rate in deg/s (optional, default 0.1 deg/s)." }
+              },
+              required: ["satelliteId"]
+            }
+          },
+          {
             name: "execute_orbital_burn",
             description: "Executes thruster ignition on the satellite, altering its altitude and shifting its SGP4 orbital path to avoid conjunction collisions.",
             parameters: {
@@ -845,6 +892,42 @@ Return your response strictly in the following JSON format:
               validationProof: "Idris 2 type-level verification: FAIL. " + validation.error
             };
           }
+        } else if (name === "get_predictive_diagnostics") {
+          const satId = args.satelliteId;
+          const sat = serverTelemetry.satellites.find(s => s.id === satId);
+          if (sat) {
+            toolResult = {
+              satelliteId: satId,
+              activeAnomalies: sat.anomalies ? sat.anomalies.activeList : [],
+              predictions: sat.anomalies ? sat.anomalies.predictions : {}
+            };
+          } else {
+            toolResult = { error: `Space asset ID "${satId}" not found in tracking catalog.` };
+          }
+        } else if (name === "validate_subsystem_state") {
+          const satId = args.satelliteId;
+          const driftRate = args.driftRate || 0.1;
+          const sat = serverTelemetry.satellites.find(s => s.id === satId);
+          if (sat) {
+            const powerVal = validatePowerState(satId, sat.power ? sat.power.batterySoC : 100.0);
+            const fuelVal = validateThrusterFuel(
+              satId,
+              0.0,
+              sat.propulsion ? sat.propulsion.propellantMassKg : 400.0,
+              sat.propulsion ? sat.propulsion.fuelPressurePsi : 220.0
+            );
+            const adcsVal = validateADCSState(satId, driftRate);
+
+            toolResult = {
+              satelliteId: satId,
+              powerVerification: powerVal.success ? "SUCCESS" : "FAIL: " + powerVal.error,
+              propulsionVerification: fuelVal.success ? "SUCCESS" : "FAIL: " + fuelVal.error,
+              adcsVerification: adcsVal.success ? "SUCCESS" : "FAIL: " + adcsVal.error,
+              proofStatus: "Idris 2 Subsystem Verification Run Complete."
+            };
+          } else {
+            toolResult = { error: `Space asset ID "${satId}" not found in tracking catalog.` };
+          }
         } else if (name === "execute_orbital_burn") {
           const { satelliteId, deltaV, direction } = args;
           const result = await executeManeuver(satelliteId, deltaV, direction, `Gemini Agentic Command (${model.model})`);
@@ -952,6 +1035,16 @@ setInterval(() => {
         propellantMassKg: isDebris ? 0.0 : (s.id === 'navic-1i' ? 800.0 : 400.0)
       };
     }
+    if (!s.anomalies) {
+      s.anomalies = {
+        activeList: [],
+        predictions: {
+          batteryDepletionTimeSec: -1,
+          criticalThermalTimeSec: -1,
+          atmosphericReentryTimeSec: -1
+        }
+      };
+    }
 
     // 2. Propagate orbits (simulate orbital movement via simple longitude increment)
     if (s.id !== 'cosmos-debris') {
@@ -978,6 +1071,9 @@ setInterval(() => {
       const isShadowBlocked = (6378.137 + s.orbit.alt) * sinPhi < 6378.137;
       s.orbit.inEclipse = isBehindEarth && isShadowBlocked;
 
+      let deltaSoC = 0.0;
+      let dT = 0.0;
+
       // 4. Solar Panel Power Model
       const cosTheta = s.orbit.inEclipse ? 0.0 : Math.max(0.1, cosPhi);
       const maxPower = s.id === 'navic-1i' ? 450.0 : 280.0;
@@ -987,7 +1083,7 @@ setInterval(() => {
       const netPower = s.power.solarGenerationW - s.power.powerConsumptionW;
       const capacityWh = s.id === 'navic-1i' ? 5000.0 : 2000.0;
       // SoC speed-up factor 300
-      const deltaSoC = (netPower / (capacityWh * 3600)) * 100 * 300;
+      deltaSoC = (netPower / (capacityWh * 3600)) * 100 * 300;
       s.power.batterySoC = parseFloat(Math.max(0, Math.min(100, s.power.batterySoC + deltaSoC)).toFixed(2));
 
       // 5. Subsystem Thermal Model
@@ -997,7 +1093,7 @@ setInterval(() => {
       const Q_in = (s.power.powerConsumptionW * 0.15) + (s.orbit.inEclipse ? 0.0 : 180.0);
       const Q_out = sigma * s.thermal.radiatorEfficiency * 1.5 * (Math.pow(T_kelvin, 4) - Math.pow(T_space, 4));
       // Thermal speed-up step (dt = 60s)
-      const dT = ((Q_in - Q_out) / 25000.0) * 60;
+      dT = ((Q_in - Q_out) / 25000.0) * 60;
       s.thermal.battTemp = parseFloat(Math.max(-50, Math.min(100, s.thermal.battTemp + dT)).toFixed(2));
 
       const T_expected_kelvin = s.thermal.expectedBattTemp + 273.15;
@@ -1025,15 +1121,67 @@ setInterval(() => {
       s.propulsion.fuelPressurePsi = parseFloat(Math.max(10.0, s.propulsion.fuelPressurePsi + (Math.random() - 0.5) * 0.3).toFixed(1));
 
       // 9. LEO Orbit Drag Decay Model
+      let deltaAlt = 0.0;
       if (s.orbit.alt < 600) {
         const H_base = 50.0;
         const betaDrag = 0.0005;
         const H = H_base * (1.0 + betaDrag * (weather.solarWindSpeed - 400));
         const rho = 6e-12 * Math.exp(-(s.orbit.alt - 350.0) / H);
         const kappa = 2.5e7;
-        const deltaAlt = - kappa * rho * Math.pow(s.orbit.velocity, 2) * 1.0;
+        deltaAlt = - kappa * rho * Math.pow(s.orbit.velocity, 2) * 1.0;
         s.orbit.alt = Math.max(100, s.orbit.alt + deltaAlt);
       }
+
+      // 9.1 Anomaly Detection and Predictive Diagnostics (V3.4)
+      const activeAnomalies = [];
+      
+      // Thermal Stress anomaly: stress > 5.0 °C
+      if (s.thermal.thermalStress > 5.0) {
+        activeAnomalies.push("THERMAL_STRESS_ANOMALY");
+      }
+      // Low Power anomaly: SoC < 20.0%
+      if (s.power.batterySoC < 20.0) {
+        activeAnomalies.push("LOW_POWER_ANOMALY");
+      }
+      // Ionospheric Scintillation: SNR < 12.0 dB during severe solar weather
+      if (s.communications.downlinkSNR < 12.0 && isStorm) {
+        activeAnomalies.push("IONOSPHERIC_SCINTILLATION_ANOMALY");
+      }
+      // Drag spike: altitude decay rate is faster than expected (spiked wind speed > 500 km/s and alt < 600)
+      if (s.orbit.alt < 600.0 && weather.solarWindSpeed > 500.0 && deltaAlt < -0.005) {
+        activeAnomalies.push("DRAG_DECAY_ANOMALY");
+      }
+      // Radiation SEU Risk: SEU probability > 0.01
+      if (s.radiation.seuProbability > 0.01) {
+        activeAnomalies.push("RADIATION_SEU_RISK");
+      }
+
+      // Calculations for predictions:
+      let depletionTime = -1;
+      if (deltaSoC < 0) {
+        depletionTime = parseFloat((s.power.batterySoC / -deltaSoC).toFixed(1));
+      }
+
+      let thermalTime = -1;
+      if (dT > 0) {
+        thermalTime = parseFloat(((48.0 - s.thermal.battTemp) / dT).toFixed(1));
+        if (thermalTime < 0) thermalTime = 0; // already exceeded
+      }
+
+      let reentryTime = -1;
+      if (s.orbit.alt < 600.0 && deltaAlt < 0) {
+        reentryTime = parseFloat(((s.orbit.alt - 150.0) / -deltaAlt).toFixed(1));
+        if (reentryTime < 0) reentryTime = 0; // already decayed
+      }
+
+      s.anomalies = {
+        activeList: activeAnomalies,
+        predictions: {
+          batteryDepletionTimeSec: depletionTime,
+          criticalThermalTimeSec: thermalTime,
+          atmosphericReentryTimeSec: reentryTime
+        }
+      };
     }
 
     // 10. Sync root variables as aliases for Leaflet/Three.js/SGP4 compatibility
