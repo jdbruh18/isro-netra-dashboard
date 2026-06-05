@@ -1,5 +1,6 @@
 import store from '../core/state.js';
 import audio from '../core/audio.js';
+import { validateBurn } from '../core/avoidance-proof.js';
 
 let logContainer, inputField, submitBtn;
 
@@ -204,6 +205,16 @@ function parseUplinkCommand(command) {
 
       if (!target) {
         store.addLog(`ERROR: Space asset ID "${satId}" not recognized in catalog.`, 'danger');
+        return;
+      }
+
+      // Enforce Idris 2 type-level bounds validation locally
+      const debris = sats.find(s => s.category === 'debris') || { alt: 405.41 };
+      const safetyMargin = 2.0; // 2 km safety clearance
+      const validation = validateBurn(satId, deltaV, "PROGRADE", target.alt, debris.alt, safetyMargin);
+      if (!validation.success) {
+        store.addLog(`ERROR: Maneuver blocked by Idris 2 verification: ${validation.error}`, 'danger');
+        audio.playHover();
         return;
       }
 

@@ -11,7 +11,7 @@ COPY package*.json ./
 RUN npm install --omit=dev
 
 # Copy server, configuration and client source files
-COPY server.js db.js ./
+COPY server.js db.js verify_idris.js ./
 COPY index.html ./
 COPY styles/ ./styles/
 COPY src/ ./src/

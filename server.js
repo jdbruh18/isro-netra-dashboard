@@ -5,6 +5,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { initializeDb, getSatellites, saveSatellite, saveLog, saveAgentAction } from './db.js';
+import { validateBurn } from './src/core/avoidance-proof.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -380,6 +381,14 @@ async function executeManeuver(satId, deltaV, direction, source = "Manual Contro
   const parsedDeltaV = parseFloat(deltaV);
   if (isNaN(parsedDeltaV) || parsedDeltaV <= 0 || parsedDeltaV > 100) {
     return { status: "ERROR", message: "Invalid thrust vector magnitude. Must be a positive number under 100 m/s." };
+  }
+
+  // Enforce Idris 2 type-level bounds validation
+  const debris = serverTelemetry.satellites.find(s => s.category === 'debris') || { alt: 405.41 };
+  const safetyMargin = 2.0; // 2 km safety clearance
+  const validation = validateBurn(satId, parsedDeltaV, direction, sat.alt, debris.alt, safetyMargin);
+  if (!validation.success) {
+    return { status: "ERROR", message: "Maneuver blocked by Idris 2 verification: " + validation.error };
   }
 
   // Calculate altitude adjustment (1 m/s delta-v shifts orbit semi-major axis roughly by 1.8km in LEO)
@@ -803,13 +812,39 @@ Return your response strictly in the following JSON format:
           };
         } else if (name === "calculate_avoidance_vector") {
           const satId = args.satelliteId;
-          const isLeo = satId === 'gaganyaan' || satId === 'cosmos-debris';
-          toolResult = {
-            satelliteId: satId,
-            recommendedDeltaV: isLeo ? 1.45 : 0.85,
-            recommendedDirection: "PROGRADE",
-            estimatedOrbitalShiftKm: isLeo ? 2.61 : 12.75
-          };
+          const sat = serverTelemetry.satellites.find(s => s.id === satId);
+          const debris = serverTelemetry.satellites.find(s => s.category === 'debris') || { alt: 405.41 };
+          
+          const dv = satId === 'navic-1i' ? 0.85 : 1.45;
+          const dirStr = "PROGRADE";
+          const safetyMargin = 2.0; // 2 km safety clearance
+          
+          // Call compiled Idris 2 validator
+          const validation = validateBurn(
+            satId,
+            dv,
+            dirStr,
+            sat ? sat.alt : 405.23,
+            debris.alt,
+            safetyMargin
+          );
+
+          if (validation.success) {
+            toolResult = {
+              satelliteId: satId,
+              recommendedDeltaV: dv,
+              recommendedDirection: dirStr,
+              estimatedOrbitalShiftKm: validation.data.expectedAltitudeShift,
+              newAltitudeKm: validation.data.newAltitude,
+              validationProof: "Idris 2 type-level verification: SUCCESS. Burn magnitude and safety margin certified."
+            };
+          } else {
+            toolResult = {
+              satelliteId: satId,
+              error: validation.error,
+              validationProof: "Idris 2 type-level verification: FAIL. " + validation.error
+            };
+          }
         } else if (name === "execute_orbital_burn") {
           const { satelliteId, deltaV, direction } = args;
           const result = await executeManeuver(satelliteId, deltaV, direction, `Gemini Agentic Command (${model.model})`);
