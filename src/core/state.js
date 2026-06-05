@@ -58,13 +58,54 @@ class StateStore {
   updateState(key, newValue) {
     if (key === 'satellites' && Array.isArray(newValue)) {
       newValue.forEach(s => {
-        if (!s.health) {
-          const isDebris = s.id === 'cosmos-debris' || (s.category && s.category === 'debris') || (s.name && s.name.toLowerCase().includes('debris'));
-          s.health = {
-            solarV: isDebris ? 0.0 : 32.4,
+        if (!s.orbit) {
+          s.orbit = {
+            lat: s.lat || 10.0 + Math.random() * 20.0,
+            lng: s.lng || Math.random() * 180.0,
+            alt: s.alt || (s.category === 'debris' ? 405.0 : 450.0),
+            velocity: s.velocity || 7.6,
+            inEclipse: false,
+            burnAdjustments: s.burnAdjustments || { alt: 0 }
+          };
+        }
+        if (!s.thermal) {
+          const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
+          s.thermal = {
             battTemp: isDebris ? 0.0 : 28.5,
+            expectedBattTemp: isDebris ? 0.0 : 28.5,
+            radiatorEfficiency: isDebris ? 0.0 : 0.95,
+            thermalStress: 0.0
+          };
+        }
+        if (!s.power) {
+          const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
+          s.power = {
+            solarV: isDebris ? 0.0 : 32.4,
+            solarGenerationW: isDebris ? 0.0 : 280.0,
+            batterySoC: isDebris ? 0.0 : 92.5,
+            powerConsumptionW: isDebris ? 0.0 : (s.id === 'navic-1i' ? 180.0 : 120.0)
+          };
+        }
+        if (!s.communications) {
+          const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
+          s.communications = {
             downlinkSNR: isDebris ? 0.0 : 24.5,
-            fuelPressure: isDebris ? 0.0 : (s.id === 'navic-1i' ? 450 : 220)
+            signalQuality: isDebris ? 0.0 : 0.98
+          };
+        }
+        if (!s.radiation) {
+          const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
+          s.radiation = {
+            cumulativeDoseRad: isDebris ? 0.0 : 4.12,
+            seuProbability: isDebris ? 0.0 : 0.0001,
+            seuCount: 0
+          };
+        }
+        if (!s.propulsion) {
+          const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
+          s.propulsion = {
+            fuelPressurePsi: isDebris ? 0.0 : (s.id === 'navic-1i' ? 450.0 : 220.0),
+            propellantMassKg: isDebris ? 0.0 : (s.id === 'navic-1i' ? 800.0 : 400.0)
           };
         }
       });
@@ -174,54 +215,54 @@ class StateStore {
 
   // Correlate weather factors to active satellite systems health parameters (the Butterfly Effect)
   tickSpacecraftHealth() {
+    if (this.isOnline) return; // Skip local simulation if server telemetry is active
+
     const weather = this.state.spaceWeather;
     const sats = this.state.satellites;
-    const isStorm = weather.solarProtonFlux > 15.0 || weather.kpIndex >= 4.5;
-
+    
     sats.forEach(s => {
-      if (!s.health) return;
-      const isDebris = s.id === 'cosmos-debris' || (s.category && s.category === 'debris') || (s.name && s.name.toLowerCase().includes('debris'));
-      if (isDebris) {
-        s.health.solarV = 0.0;
-        s.health.battTemp = 0.0;
-        s.health.downlinkSNR = 0.0;
-        s.health.fuelPressure = 0.0;
-        return;
-      }
+      const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
+      if (isDebris) return;
 
-      // 1. Battery Temp correlation (induced currents during magnetic surges)
-      if (isStorm) {
-        s.health.battTemp += 0.4;
-        if (s.health.battTemp > 52.0) s.health.battTemp = 52.0;
-      } else {
-        s.health.battTemp -= 0.2;
-        if (s.health.battTemp < 28.5) s.health.battTemp = 28.5;
-      }
+      if (s.orbit && s.power && s.thermal && s.communications && s.radiation && s.propulsion) {
+        // Run simple physics simulation updates locally
+        const rad = Math.PI / 180;
+        const sunLng = ((Date.now() / 240000) * 360) % 360;
+        const cosPhi = Math.cos(s.orbit.lat * rad) * Math.cos((s.orbit.lng - sunLng) * rad);
+        const sinPhi = Math.sqrt(1 - cosPhi * cosPhi);
+        const isBehindEarth = cosPhi < 0;
+        const isShadowBlocked = (6378.137 + s.orbit.alt) * sinPhi < 6378.137;
+        s.orbit.inEclipse = isBehindEarth && isShadowBlocked;
 
-      // 2. Comms Link SNR degradation (ionospheric scintillation)
-      const noise = (Math.random() - 0.5) * 1.0;
-      s.health.downlinkSNR = 26.5 - weather.kpIndex * 2.2 + noise;
-      if (s.health.downlinkSNR < 5.0) s.health.downlinkSNR = 5.0;
-      if (s.health.downlinkSNR > 30.0) s.health.downlinkSNR = 30.0;
+        const cosTheta = s.orbit.inEclipse ? 0.0 : Math.max(0.1, cosPhi);
+        s.power.solarGenerationW = s.orbit.inEclipse ? 0.0 : parseFloat((280.0 * cosTheta).toFixed(1));
+        s.power.solarV = s.orbit.inEclipse ? 0.0 : parseFloat((30.0 + 4.1 * cosTheta + (Math.random() - 0.5) * 0.3).toFixed(2));
+        const netPower = s.power.solarGenerationW - s.power.powerConsumptionW;
+        s.power.batterySoC = parseFloat(Math.max(0, Math.min(100, s.power.batterySoC + netPower / 1000.0)).toFixed(2));
 
-      // 3. Solar panel voltage fluctuations (charge ionization drops panel efficiency)
-      if (isStorm) {
-        s.health.solarV += (Math.random() - 0.5) * 2.0 - 0.4;
-        if (s.health.solarV < 16.5) s.health.solarV = 16.5;
-        if (s.health.solarV > 34.0) s.health.solarV = 34.0;
-      } else {
-        s.health.solarV += (32.4 - s.health.solarV) * 0.1;
-      }
+        const T_space = 3.0;
+        const sigma = 5.67e-8;
+        const T_kelvin = s.thermal.battTemp + 273.15;
+        const Q_in = (s.power.powerConsumptionW * 0.15) + (s.orbit.inEclipse ? 0.0 : 180.0);
+        const Q_out = sigma * s.thermal.radiatorEfficiency * 1.5 * (Math.pow(T_kelvin, 4) - Math.pow(T_space, 4));
+        const dT = ((Q_in - Q_out) / 25000.0) * 60;
+        s.thermal.battTemp = parseFloat(Math.max(-50, Math.min(100, s.thermal.battTemp + dT)).toFixed(2));
+        s.thermal.expectedBattTemp = s.thermal.battTemp;
+        s.thermal.thermalStress = 0.0;
 
-      // 4. Fuel Propellant pressure (stable with tiny variations)
-      s.health.fuelPressure += (Math.random() - 0.5) * 0.3;
-      if (s.health.fuelPressure < 10.0) s.health.fuelPressure = 10.0;
+        const gamma = 1e-5;
+        s.radiation.cumulativeDoseRad = parseFloat((s.radiation.cumulativeDoseRad + gamma * weather.solarProtonFlux).toFixed(4));
+        const P_seu = 0.00005 * weather.solarProtonFlux * Math.exp(weather.kpIndex / 3.0);
+        s.radiation.seuProbability = parseFloat(Math.min(1.0, P_seu).toFixed(5));
+        if (Math.random() < P_seu) {
+          s.radiation.seuCount++;
+        }
 
-      // 5. Atmospheric drag altitude decay (solar wind expands thermosphere)
-      if (s.alt < 600) {
-        const decayRate = weather.solarWindSpeed > 500 ? 0.015 : 0.002;
-        s.alt -= decayRate;
-        if (s.alt < 100) s.alt = 100; // block atmospheric burning re-entry
+        const noise = (Math.random() - 0.5) * 1.0;
+        s.communications.downlinkSNR = parseFloat((26.5 - weather.kpIndex * 2.2 + noise).toFixed(1));
+        s.communications.downlinkSNR = Math.max(5.0, Math.min(30.0, s.communications.downlinkSNR));
+        s.communications.signalQuality = parseFloat((s.communications.downlinkSNR / 30.0).toFixed(2));
+        s.propulsion.fuelPressurePsi = parseFloat(Math.max(10.0, s.propulsion.fuelPressurePsi + (Math.random() - 0.5) * 0.3).toFixed(1));
       }
     });
 

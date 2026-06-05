@@ -38,10 +38,17 @@ export function initCollisionMonitor() {
 function updateSatelliteDetails(sat) {
   if (!sat) return;
   document.getElementById('sat-detail-name').textContent = sat.name;
-  document.getElementById('sat-detail-alt').textContent = typeof sat.alt === 'number' ? `${sat.alt.toFixed(1)} km` : '---';
-  document.getElementById('sat-detail-vel').textContent = typeof sat.velocity === 'number' ? `${sat.velocity.toFixed(2)} km/s` : '---';
-  document.getElementById('sat-detail-lat').textContent = typeof sat.lat === 'number' ? `${sat.lat.toFixed(4)}° N` : '0.0000° N';
-  document.getElementById('sat-detail-lng').textContent = typeof sat.lng === 'number' ? `${sat.lng.toFixed(4)}° E` : '0.0000° E';
+  
+  // Use nested orbit details if available
+  const alt = sat.orbit ? sat.orbit.alt : sat.alt;
+  const velocity = sat.orbit ? sat.orbit.velocity : sat.velocity;
+  const lat = sat.orbit ? sat.orbit.lat : sat.lat;
+  const lng = sat.orbit ? sat.orbit.lng : sat.lng;
+
+  document.getElementById('sat-detail-alt').textContent = typeof alt === 'number' ? `${alt.toFixed(1)} km` : '---';
+  document.getElementById('sat-detail-vel').textContent = typeof velocity === 'number' ? `${velocity.toFixed(2)} km/s` : '---';
+  document.getElementById('sat-detail-lat').textContent = typeof lat === 'number' ? `${lat.toFixed(4)}° N` : '0.0000° N';
+  document.getElementById('sat-detail-lng').textContent = typeof lng === 'number' ? `${lng.toFixed(4)}° E` : '0.0000° E';
   document.getElementById('sat-detail-status').textContent = sat.threatLevel === 'NORMAL' ? 'ORBIT OK' : 'CORRIDOR RISK';
   
   const statVal = document.getElementById('sat-detail-status');
@@ -51,66 +58,102 @@ function updateSatelliteDetails(sat) {
     statVal.className = 'sat-details-val danger';
   }
 
-  // Update subsystem health indicators (Sprint 4)
+  // Update subsystem health indicators (V3.1)
+  const eclipseEl = document.getElementById('sat-detail-eclipse');
   const solarEl = document.getElementById('sat-detail-solar');
+  const solarGenEl = document.getElementById('sat-detail-solar-gen');
+  const socEl = document.getElementById('sat-detail-soc');
   const battEl = document.getElementById('sat-detail-batt-temp');
+  const stressEl = document.getElementById('sat-detail-thermal-stress');
   const snrEl = document.getElementById('sat-detail-snr');
+  const radEl = document.getElementById('sat-detail-radiation');
+  const seuEl = document.getElementById('sat-detail-seu');
+  const propEl = document.getElementById('sat-detail-propellant-mass');
   const fuelEl = document.getElementById('sat-detail-fuel');
 
-  if (solarEl && battEl && snrEl && fuelEl) {
-    if (sat.health) {
-      solarEl.textContent = `${sat.health.solarV.toFixed(1)} V`;
-      battEl.textContent = `${sat.health.battTemp.toFixed(1)}°C`;
-      snrEl.textContent = `${sat.health.downlinkSNR.toFixed(1)} dB`;
-      fuelEl.textContent = `${sat.health.fuelPressure.toFixed(0)} psi`;
+  const isDebris = sat.id === 'cosmos-debris' || (sat.category && sat.category === 'debris') || (sat.name && sat.name.toLowerCase().includes('debris'));
 
-      const isDebris = sat.id === 'cosmos-debris' || (sat.category && sat.category === 'debris') || (sat.name && sat.name.toLowerCase().includes('debris'));
-
-      if (isDebris) {
-        solarEl.className = 'sat-details-val';
-        battEl.className = 'sat-details-val';
-        snrEl.className = 'sat-details-val';
-        fuelEl.className = 'sat-details-val';
-      } else {
-        // Solar panel voltage: normal ~32V, warning < 25V, danger < 20V
-        if (sat.health.solarV < 20.0) {
-          solarEl.className = 'sat-details-val danger';
-        } else if (sat.health.solarV < 25.0) {
-          solarEl.className = 'sat-details-val warning';
-        } else {
-          solarEl.className = 'sat-details-val normal';
-        }
-
-        // Battery Temp: normal < 40°C, warning > 45°C, danger > 48°C
-        if (sat.health.battTemp > 48.0) {
-          battEl.className = 'sat-details-val danger';
-        } else if (sat.health.battTemp > 45.0) {
-          battEl.className = 'sat-details-val warning';
-        } else {
-          battEl.className = 'sat-details-val normal';
-        }
-
-        // Comms SNR: normal > 18dB, warning < 15dB, danger < 12dB
-        if (sat.health.downlinkSNR < 12.0) {
-          snrEl.className = 'sat-details-val danger';
-        } else if (sat.health.downlinkSNR < 15.0) {
-          snrEl.className = 'sat-details-val warning';
-        } else {
-          snrEl.className = 'sat-details-val normal';
-        }
-
-        fuelEl.className = 'sat-details-val normal';
-      }
-    } else {
-      solarEl.textContent = 'N/A';
-      battEl.textContent = 'N/A';
-      snrEl.textContent = 'N/A';
-      fuelEl.textContent = 'N/A';
-      solarEl.className = 'sat-details-val';
-      battEl.className = 'sat-details-val';
-      snrEl.className = 'sat-details-val';
-      fuelEl.className = 'sat-details-val';
+  // Helper to safely set content and classes
+  const setField = (el, text, className) => {
+    if (el) {
+      el.textContent = text;
+      if (className !== undefined) el.className = className;
     }
+  };
+
+  if (isDebris) {
+    setField(eclipseEl, 'INACTIVE', 'sat-details-val');
+    setField(solarEl, '0.0 V');
+    setField(solarGenEl, '0 W');
+    setField(socEl, '0.0%', 'sat-details-val');
+    setField(battEl, '0.0°C');
+    setField(stressEl, '0.0°C');
+    setField(snrEl, '0.0 dB', 'sat-details-val');
+    setField(radEl, '0.00 Rad');
+    setField(seuEl, '0 SEU');
+    setField(propEl, '0.0 kg');
+    setField(fuelEl, '0 psi', 'sat-details-val');
+    return;
+  }
+
+  if (sat.orbit) {
+    setField(eclipseEl, sat.orbit.inEclipse ? 'IN SHADOW' : 'SUNLIGHT', sat.orbit.inEclipse ? 'sat-details-val warning' : 'sat-details-val normal');
+  } else {
+    setField(eclipseEl, 'SUNLIGHT', 'sat-details-val normal');
+  }
+
+  if (sat.power) {
+    setField(solarEl, `${sat.power.solarV.toFixed(1)} V`);
+    setField(solarGenEl, `${sat.power.solarGenerationW.toFixed(0)} W`);
+    
+    let socClass = 'sat-details-val normal';
+    if (sat.power.batterySoC < 30.0) socClass = 'sat-details-val danger';
+    else if (sat.power.batterySoC < 65.0) socClass = 'sat-details-val warning';
+    setField(socEl, `${sat.power.batterySoC.toFixed(1)}%`, socClass);
+  } else {
+    setField(solarEl, 'N/A');
+    setField(solarGenEl, 'N/A');
+    setField(socEl, 'N/A', 'sat-details-val');
+  }
+
+  if (sat.thermal) {
+    setField(battEl, `${sat.thermal.battTemp.toFixed(1)}°C`);
+    setField(stressEl, `${sat.thermal.thermalStress.toFixed(1)}°C`);
+    
+    let battClass = 'sat-details-val normal';
+    if (sat.thermal.battTemp > 48.0) battClass = 'sat-details-val danger';
+    else if (sat.thermal.battTemp > 45.0) battClass = 'sat-details-val warning';
+    battEl.className = battClass;
+  } else {
+    setField(battEl, 'N/A');
+    setField(stressEl, 'N/A');
+  }
+
+  if (sat.communications) {
+    setField(snrEl, `${sat.communications.downlinkSNR.toFixed(1)} dB`);
+    
+    let snrClass = 'sat-details-val normal';
+    if (sat.communications.downlinkSNR < 12.0) snrClass = 'sat-details-val danger';
+    else if (sat.communications.downlinkSNR < 15.0) snrClass = 'sat-details-val warning';
+    snrEl.className = snrClass;
+  } else {
+    setField(snrEl, 'N/A', 'sat-details-val');
+  }
+
+  if (sat.radiation) {
+    setField(radEl, `${sat.radiation.cumulativeDoseRad.toFixed(2)} Rad`);
+    setField(seuEl, `${sat.radiation.seuCount} SEU`);
+  } else {
+    setField(radEl, 'N/A');
+    setField(seuEl, 'N/A');
+  }
+
+  if (sat.propulsion) {
+    setField(propEl, `${sat.propulsion.propellantMassKg.toFixed(1)} kg`);
+    setField(fuelEl, `${sat.propulsion.fuelPressurePsi.toFixed(0)} psi`, 'sat-details-val normal');
+  } else {
+    setField(propEl, 'N/A');
+    setField(fuelEl, 'N/A', 'sat-details-val');
   }
 }
 

@@ -183,16 +183,21 @@ async function queryGeminiAgent(message, typingId) {
       const diagnostics = sats.map(s => ({
         id: s.id,
         name: s.name,
-        health: s.health || { solarV: 32.4, battTemp: 28.5, downlinkSNR: 24.5, fuelPressure: 220 }
+        orbit: s.orbit || {},
+        thermal: s.thermal || {},
+        power: s.power || {},
+        communications: s.communications || {},
+        radiation: s.radiation || {},
+        propulsion: s.propulsion || {}
       }));
       store.addAgentLog("get_anomaly_diagnostics", {}, { diagnostics });
       store.addLog("[GEMINI-AGENT] Tool Call: get_anomaly_diagnostics()", 'ai');
 
       const isStorm = weather.solarProtonFlux > 15.0 || weather.kpIndex >= 4.5;
-      const anomalousSat = sats.find(s => s.health && s.id !== 'cosmos-debris' && (s.health.battTemp > 45.0 || s.health.downlinkSNR < 12.0));
+      const anomalousSat = sats.find(s => s.id !== 'cosmos-debris' && ((s.thermal && s.thermal.battTemp > 45.0) || (s.communications && s.communications.downlinkSNR < 12.0)));
 
       if (anomalousSat && isStorm) {
-        reply = `**A.E.G.I.S. Space Operations Diagnostic Report**\n\nI ran full telemetry checks and detected severe solar storm induced anomalies (the Butterfly Effect):\n\n- **Space Asset**: ${anomalousSat.name}\n- **Subsystem Anomalies**:\n  - Battery Temperature: **${anomalousSat.health.battTemp.toFixed(1)}°C** (Induced currents alert)\n  - Communication Downlink SNR: **${anomalousSat.health.downlinkSNR.toFixed(1)} dB** (Ionospheric Scintillation)\n\n- **Conjunction Corridor Alerts**: ${activeConjunctions.length > 0 ? `${activeConjunctions.length} threats active (e.g. ${activeConjunctions[0].activeName} near ${activeConjunctions[0].debrisName})` : 'NO - paths clear'}\n\n**Recommendation**: Defer thruster burn sequence. Firing thrusters while systems are experiencing ESD and battery thermal spikes risks electronic failure.`;
+        reply = `**A.E.G.I.S. Space Operations Diagnostic Report**\n\nI ran full telemetry checks and detected severe solar storm induced anomalies (the Butterfly Effect):\n\n- **Space Asset**: ${anomalousSat.name}\n- **Subsystem Anomalies**:\n  - Battery Temperature: **${anomalousSat.thermal.battTemp.toFixed(1)}°C** (Induced currents alert)\n  - Communication Downlink SNR: **${anomalousSat.communications.downlinkSNR.toFixed(1)} dB** (Ionospheric Scintillation)\n\n- **Conjunction Corridor Alerts**: ${activeConjunctions.length > 0 ? `${activeConjunctions.length} threats active (e.g. ${activeConjunctions[0].activeName} near ${activeConjunctions[0].debrisName})` : 'NO - paths clear'}\n\n**Recommendation**: Defer thruster burn sequence. Firing thrusters while systems are experiencing ESD and battery thermal spikes risks electronic failure.`;
       } else if (activeConjunctions.length > 0) {
         const topConjunction = activeConjunctions[0];
         reply = `**A.E.G.I.S. Space Intelligence Report**\n\nI executed telemetry checks. Subsystems are stable, but dynamic conjunction warnings are active:\n\n- **Spacecraft**: ${topConjunction.activeName}\n- **Intersector**: ${topConjunction.debrisName}\n- **Miss Distance**: **${topConjunction.distance.toFixed(1)} km**\n- **Risk Score (Probability)**: **${topConjunction.probability.toFixed(1)}%**\n- **Threat Level**: **${topConjunction.dangerLevel}**\n\nSpace weather is CLEAR. I recommend executing an evasive burn. Ask me to: **"evade collision"** to steer ${topConjunction.activeName}.`;
@@ -256,9 +261,11 @@ async function queryGeminiAgent(message, typingId) {
           const altShift = shiftKm;
           
           if (targetSat) {
-            if (!targetSat.burnAdjustments) targetSat.burnAdjustments = { alt: 0 };
-            targetSat.burnAdjustments.alt += altShift;
-            targetSat.alt += altShift;
+            if (!targetSat.orbit) targetSat.orbit = { alt: targetSat.alt, burnAdjustments: { alt: 0 } };
+            if (!targetSat.orbit.burnAdjustments) targetSat.orbit.burnAdjustments = { alt: 0 };
+            targetSat.orbit.burnAdjustments.alt += altShift;
+            targetSat.orbit.alt += altShift;
+            targetSat.alt = targetSat.orbit.alt;
             targetSat.threatLevel = 'NORMAL';
             targetSat.threatDetails = 'Orbit raised. Space debris cleared.';
           }
@@ -411,7 +418,12 @@ Format your final response in clear, concise markdown with appropriate headers. 
       const diagnostics = sats.map(s => ({
         id: s.id,
         name: s.name,
-        health: s.health || { solarV: 32.4, battTemp: 28.5, downlinkSNR: 24.5, fuelPressure: 220 }
+        orbit: s.orbit || {},
+        thermal: s.thermal || {},
+        power: s.power || {},
+        communications: s.communications || {},
+        radiation: s.radiation || {},
+        propulsion: s.propulsion || {}
       }));
       responseData = { diagnostics };
     } else if (name === "consult_solar_physics_analyst") {
@@ -487,9 +499,11 @@ Return your response strictly in the following JSON format:
       const altShift = deltaV * shiftMultiplier;
       
       if (target) {
-        if (!target.burnAdjustments) target.burnAdjustments = { alt: 0 };
-        target.burnAdjustments.alt += altShift;
-        target.alt += altShift;
+        if (!target.orbit) target.orbit = { alt: target.alt, burnAdjustments: { alt: 0 } };
+        if (!target.orbit.burnAdjustments) target.orbit.burnAdjustments = { alt: 0 };
+        target.orbit.burnAdjustments.alt += altShift;
+        target.orbit.alt += altShift;
+        target.alt = target.orbit.alt;
         target.threatLevel = 'NORMAL';
         target.threatDetails = 'Orbit corrected. Space debris cleared.';
       }

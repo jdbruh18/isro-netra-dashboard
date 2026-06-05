@@ -108,12 +108,38 @@ let serverTelemetry = {
       tle1: "1 99901U 26001A   26155.50000000  .00020000  00000-0  10000-3 0  9991",
       tle2: "2 99901  51.6400 120.5000 0005000  30.0000 330.0000 15.60000000    12",
       category: "indian",
-      burnAdjustments: { alt: 0 }, // Tracks delta-V shifts
-      health: {
-        solarV: 32.4,
+      orbit: {
+        lat: 15.3421,
+        lng: 75.8922,
+        alt: 405.23,
+        velocity: 7.67,
+        inEclipse: false,
+        burnAdjustments: { alt: 0 }
+      },
+      thermal: {
         battTemp: 28.5,
+        expectedBattTemp: 28.5,
+        radiatorEfficiency: 0.95,
+        thermalStress: 0.0
+      },
+      power: {
+        solarV: 32.4,
+        solarGenerationW: 280.0,
+        batterySoC: 92.5,
+        powerConsumptionW: 120.0
+      },
+      communications: {
         downlinkSNR: 24.5,
-        fuelPressure: 220
+        signalQuality: 0.98
+      },
+      radiation: {
+        cumulativeDoseRad: 4.12,
+        seuProbability: 0.0001,
+        seuCount: 0
+      },
+      propulsion: {
+        fuelPressurePsi: 220.0,
+        propellantMassKg: 400.0
       }
     },
     {
@@ -130,11 +156,38 @@ let serverTelemetry = {
       tle1: "1 99902U 21000A   26155.49900000  .00030000  00000-0  20000-3 0  9995",
       tle2: "2 99902  51.6420 120.4850 0005200  28.0000 332.0000 15.60150000    16",
       category: "debris",
-      health: {
-        solarV: 0.0,
+      orbit: {
+        lat: 15.3510,
+        lng: 75.8990,
+        alt: 405.41,
+        velocity: 7.68,
+        inEclipse: false,
+        burnAdjustments: { alt: 0 }
+      },
+      thermal: {
         battTemp: 0.0,
+        expectedBattTemp: 0.0,
+        radiatorEfficiency: 0.0,
+        thermalStress: 0.0
+      },
+      power: {
+        solarV: 0.0,
+        solarGenerationW: 0.0,
+        batterySoC: 0.0,
+        powerConsumptionW: 0.0
+      },
+      communications: {
         downlinkSNR: 0.0,
-        fuelPressure: 0.0
+        signalQuality: 0.0
+      },
+      radiation: {
+        cumulativeDoseRad: 0.0,
+        seuProbability: 0.0,
+        seuCount: 0
+      },
+      propulsion: {
+        fuelPressurePsi: 0.0,
+        propellantMassKg: 0.0
       }
     },
     {
@@ -151,11 +204,38 @@ let serverTelemetry = {
       tle1: "1 44804U 19081A   26155.50000000  .00001000  00000-0  50000-4 0  9992",
       tle2: "2 44804  97.4000 230.1200 0012000  90.0000 270.0000 15.20000000    13",
       category: "indian",
-      health: {
-        solarV: 31.8,
+      orbit: {
+        lat: -40.1245,
+        lng: 130.4512,
+        alt: 509.15,
+        velocity: 7.61,
+        inEclipse: false,
+        burnAdjustments: { alt: 0 }
+      },
+      thermal: {
         battTemp: 27.2,
+        expectedBattTemp: 27.2,
+        radiatorEfficiency: 0.95,
+        thermalStress: 0.0
+      },
+      power: {
+        solarV: 31.8,
+        solarGenerationW: 240.0,
+        batterySoC: 88.0,
+        powerConsumptionW: 100.0
+      },
+      communications: {
         downlinkSNR: 22.8,
-        fuelPressure: 180
+        signalQuality: 0.97
+      },
+      radiation: {
+        cumulativeDoseRad: 3.54,
+        seuProbability: 0.00008,
+        seuCount: 0
+      },
+      propulsion: {
+        fuelPressurePsi: 180.0,
+        propellantMassKg: 300.0
       }
     },
     {
@@ -172,11 +252,38 @@ let serverTelemetry = {
       tle1: "1 43286U 18035A   26155.50000000  .00000100  00000-0  00000-0 0  9993",
       tle2: "2 43286  29.0000  80.2000 0020000 180.0000 180.0000  1.00270000    14",
       category: "indian",
-      health: {
-        solarV: 34.1,
+      orbit: {
+        lat: 10.4512,
+        lng: 80.1245,
+        alt: 35786.11,
+        velocity: 3.08,
+        inEclipse: false,
+        burnAdjustments: { alt: 0 }
+      },
+      thermal: {
         battTemp: 29.8,
+        expectedBattTemp: 29.8,
+        radiatorEfficiency: 0.95,
+        thermalStress: 0.0
+      },
+      power: {
+        solarV: 34.1,
+        solarGenerationW: 450.0,
+        batterySoC: 95.0,
+        powerConsumptionW: 180.0
+      },
+      communications: {
         downlinkSNR: 25.1,
-        fuelPressure: 450
+        signalQuality: 0.99
+      },
+      radiation: {
+        cumulativeDoseRad: 12.8,
+        seuProbability: 0.0005,
+        seuCount: 0
+      },
+      propulsion: {
+        fuelPressurePsi: 450.0,
+        propellantMassKg: 800.0
       }
     }
   ],
@@ -279,9 +386,20 @@ async function executeManeuver(satId, deltaV, direction, source = "Manual Contro
   const shiftMultiplier = sat.alt > 1000 ? 15 : 1.8;
   const altShift = parsedDeltaV * shiftMultiplier;
   
-  if (!sat.burnAdjustments) sat.burnAdjustments = { alt: 0 };
-  sat.burnAdjustments.alt += altShift;
-  sat.alt += altShift;
+  if (!sat.orbit) {
+    sat.orbit = {
+      lat: sat.lat || 0,
+      lng: sat.lng || 0,
+      alt: sat.alt || 0,
+      velocity: sat.velocity || 0,
+      inEclipse: false,
+      burnAdjustments: { alt: 0 }
+    };
+  }
+  if (!sat.orbit.burnAdjustments) sat.orbit.burnAdjustments = { alt: 0 };
+  sat.orbit.burnAdjustments.alt += altShift;
+  sat.orbit.alt += altShift;
+  sat.alt = sat.orbit.alt;
   sat.threatLevel = "NORMAL";
   sat.threatDetails = `Orbit corrected by ${altShift.toFixed(2)}km. Collision risk mitigated.`;
 
@@ -576,7 +694,12 @@ Format your final response in clear, concise markdown with appropriate headers. 
           const diagnostics = serverTelemetry.satellites.map(s => ({
             id: s.id,
             name: s.name,
-            health: s.health || { solarV: 32.4, battTemp: 28.5, downlinkSNR: 24.5, fuelPressure: 220 }
+            orbit: s.orbit || {},
+            thermal: s.thermal || {},
+            power: s.power || {},
+            communications: s.communications || {},
+            radiation: s.radiation || {},
+            propulsion: s.propulsion || {}
           }));
           toolResult = { diagnostics };
         } else if (name === "get_active_conjunctions") {
@@ -743,74 +866,146 @@ setInterval(() => {
   const isStorm = weather.solarProtonFlux > 15.0 || weather.kpIndex >= 4.5;
 
   serverTelemetry.satellites.forEach(s => {
-    if (s.lat === undefined || s.lat === null || isNaN(s.lat)) {
-      s.lat = 10.0 + Math.random() * 20.0;
+    // 1. Initialize nested subsystem states if missing (catalog additions)
+    if (!s.orbit) {
+      s.orbit = {
+        lat: s.lat || 10.0 + Math.random() * 20.0,
+        lng: s.lng || Math.random() * 180.0,
+        alt: s.alt || (s.category === 'debris' ? 405.0 : 450.0),
+        velocity: s.velocity || 7.6,
+        inEclipse: false,
+        burnAdjustments: s.burnAdjustments || { alt: 0 }
+      };
     }
-    if (s.lng === undefined || s.lng === null || isNaN(s.lng)) {
-      s.lng = Math.random() * 180.0;
-    }
-    if (s.alt === undefined || s.alt === null || isNaN(s.alt)) {
-      s.alt = s.category === 'debris' ? 405.0 : 450.0;
-    }
-    if (s.velocity === undefined || s.velocity === null || isNaN(s.velocity)) {
-      s.velocity = 7.6;
-    }
-
-    if (s.id !== 'cosmos-debris') {
-      s.lng = (s.lng + 0.05) % 180;
-    } else {
-      s.lng = (s.lng + 0.051) % 180; // Debris moves slightly faster to simulate intersection
-    }
-
-    // Seed default health structure if missing in memory
-    if (!s.health) {
-      const isDebris = s.id === 'cosmos-debris' || (s.category && s.category === 'debris') || (s.name && s.name.toLowerCase().includes('debris'));
-      s.health = {
-        solarV: isDebris ? 0.0 : 32.4,
+    if (!s.thermal) {
+      const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
+      s.thermal = {
         battTemp: isDebris ? 0.0 : 28.5,
+        expectedBattTemp: isDebris ? 0.0 : 28.5,
+        radiatorEfficiency: isDebris ? 0.0 : 0.95,
+        thermalStress: 0.0
+      };
+    }
+    if (!s.power) {
+      const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
+      s.power = {
+        solarV: isDebris ? 0.0 : 32.4,
+        solarGenerationW: isDebris ? 0.0 : 280.0,
+        batterySoC: isDebris ? 0.0 : 92.5,
+        powerConsumptionW: isDebris ? 0.0 : (s.id === 'navic-1i' ? 180.0 : 120.0)
+      };
+    }
+    if (!s.communications) {
+      const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
+      s.communications = {
         downlinkSNR: isDebris ? 0.0 : 24.5,
-        fuelPressure: isDebris ? 0.0 : (s.id === 'navic-1i' ? 450 : 220)
+        signalQuality: isDebris ? 0.0 : 0.98
+      };
+    }
+    if (!s.radiation) {
+      const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
+      s.radiation = {
+        cumulativeDoseRad: isDebris ? 0.0 : 4.12,
+        seuProbability: isDebris ? 0.0 : 0.0001,
+        seuCount: 0
+      };
+    }
+    if (!s.propulsion) {
+      const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
+      s.propulsion = {
+        fuelPressurePsi: isDebris ? 0.0 : (s.id === 'navic-1i' ? 450.0 : 220.0),
+        propellantMassKg: isDebris ? 0.0 : (s.id === 'navic-1i' ? 800.0 : 400.0)
       };
     }
 
-    // Dynamic health parameters updates (Geomagnetic battery spikes, Comms SNR scintillation, solar V drops)
-    const isDebris = s.id === 'cosmos-debris' || (s.category && s.category === 'debris') || (s.name && s.name.toLowerCase().includes('debris'));
+    // 2. Propagate orbits (simulate orbital movement via simple longitude increment)
+    if (s.id !== 'cosmos-debris') {
+      s.orbit.lng = (s.orbit.lng + 0.05) % 180;
+    } else {
+      s.orbit.lng = (s.orbit.lng + 0.051) % 180;
+    }
+    if (s.orbit.lat === undefined || isNaN(s.orbit.lat)) {
+      s.orbit.lat = 10.0 + Math.random() * 20.0;
+    }
+    if (s.orbit.velocity === undefined || isNaN(s.orbit.velocity)) {
+      s.orbit.velocity = s.id === 'navic-1i' ? 3.08 : 7.6;
+    }
+
+    const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
+
     if (!isDebris) {
-      // 1. Battery Temp correlation
-      if (isStorm) {
-        s.health.battTemp += 0.4;
-        if (s.health.battTemp > 52.0) s.health.battTemp = 52.0;
-      } else {
-        s.health.battTemp -= 0.2;
-        if (s.health.battTemp < 28.5) s.health.battTemp = 28.5;
+      // 3. Solar Eclipse Model
+      const rad = Math.PI / 180;
+      const sunLng = ((Date.now() / 240000) * 360) % 360; // 4 min full cycle
+      const cosPhi = Math.cos(s.orbit.lat * rad) * Math.cos((s.orbit.lng - sunLng) * rad);
+      const sinPhi = Math.sqrt(1 - cosPhi * cosPhi);
+      const isBehindEarth = cosPhi < 0;
+      const isShadowBlocked = (6378.137 + s.orbit.alt) * sinPhi < 6378.137;
+      s.orbit.inEclipse = isBehindEarth && isShadowBlocked;
+
+      // 4. Solar Panel Power Model
+      const cosTheta = s.orbit.inEclipse ? 0.0 : Math.max(0.1, cosPhi);
+      const maxPower = s.id === 'navic-1i' ? 450.0 : 280.0;
+      s.power.solarGenerationW = s.orbit.inEclipse ? 0.0 : parseFloat((maxPower * cosTheta).toFixed(1));
+      s.power.solarV = s.orbit.inEclipse ? 0.0 : parseFloat((30.0 + 4.1 * cosTheta + (Math.random() - 0.5) * 0.3).toFixed(2));
+      
+      const netPower = s.power.solarGenerationW - s.power.powerConsumptionW;
+      const capacityWh = s.id === 'navic-1i' ? 5000.0 : 2000.0;
+      // SoC speed-up factor 300
+      const deltaSoC = (netPower / (capacityWh * 3600)) * 100 * 300;
+      s.power.batterySoC = parseFloat(Math.max(0, Math.min(100, s.power.batterySoC + deltaSoC)).toFixed(2));
+
+      // 5. Subsystem Thermal Model
+      const T_space = 3.0; // Kelvin
+      const sigma = 5.67e-8;
+      const T_kelvin = s.thermal.battTemp + 273.15;
+      const Q_in = (s.power.powerConsumptionW * 0.15) + (s.orbit.inEclipse ? 0.0 : 180.0);
+      const Q_out = sigma * s.thermal.radiatorEfficiency * 1.5 * (Math.pow(T_kelvin, 4) - Math.pow(T_space, 4));
+      // Thermal speed-up step (dt = 60s)
+      const dT = ((Q_in - Q_out) / 25000.0) * 60;
+      s.thermal.battTemp = parseFloat(Math.max(-50, Math.min(100, s.thermal.battTemp + dT)).toFixed(2));
+
+      const T_expected_kelvin = s.thermal.expectedBattTemp + 273.15;
+      const Q_out_expected = sigma * 0.95 * 1.5 * (Math.pow(T_expected_kelvin, 4) - Math.pow(T_space, 4));
+      const dT_expected = ((Q_in - Q_out_expected) / 25000.0) * 60;
+      s.thermal.expectedBattTemp = parseFloat(Math.max(-50, Math.min(100, s.thermal.expectedBattTemp + dT_expected)).toFixed(2));
+      s.thermal.thermalStress = parseFloat(Math.abs(s.thermal.battTemp - s.thermal.expectedBattTemp).toFixed(2));
+
+      // 6. Space Radiation Model
+      const gamma = 1e-5;
+      s.radiation.cumulativeDoseRad = parseFloat((s.radiation.cumulativeDoseRad + gamma * weather.solarProtonFlux).toFixed(4));
+      const P_seu = 0.00005 * weather.solarProtonFlux * Math.exp(weather.kpIndex / 3.0);
+      s.radiation.seuProbability = parseFloat(Math.min(1.0, P_seu).toFixed(5));
+      if (Math.random() < P_seu) {
+        s.radiation.seuCount++;
       }
 
-      // 2. Comms Link SNR degradation
+      // 7. Communications Link SNR
       const noise = (Math.random() - 0.5) * 1.0;
-      s.health.downlinkSNR = 26.5 - weather.kpIndex * 2.2 + noise;
-      if (s.health.downlinkSNR < 5.0) s.health.downlinkSNR = 5.0;
-      if (s.health.downlinkSNR > 30.0) s.health.downlinkSNR = 30.0;
+      s.communications.downlinkSNR = parseFloat((26.5 - weather.kpIndex * 2.2 + noise).toFixed(1));
+      s.communications.downlinkSNR = Math.max(5.0, Math.min(30.0, s.communications.downlinkSNR));
+      s.communications.signalQuality = parseFloat((s.communications.downlinkSNR / 30.0).toFixed(2));
 
-      // 3. Solar Panel Voltage
-      if (isStorm) {
-        s.health.solarV += (Math.random() - 0.5) * 2.0 - 0.4;
-        if (s.health.solarV < 16.5) s.health.solarV = 16.5;
-        if (s.health.solarV > 34.0) s.health.solarV = 34.0;
-      } else {
-        s.health.solarV += (32.4 - s.health.solarV) * 0.1;
-      }
+      // 8. Fuel Propellant Pressure
+      s.propulsion.fuelPressurePsi = parseFloat(Math.max(10.0, s.propulsion.fuelPressurePsi + (Math.random() - 0.5) * 0.3).toFixed(1));
 
-      // 4. Fuel Propellant pressure
-      s.health.fuelPressure += (Math.random() - 0.5) * 0.3;
-      if (s.health.fuelPressure < 10.0) s.health.fuelPressure = 10.0;
-
-      // 5. Atmospheric drag decay (wind heats thermosphere -> decays orbit)
-      if (s.alt < 600) {
-        const decayRate = weather.solarWindSpeed > 500 ? 0.015 : 0.002;
-        s.alt -= decayRate;
-        if (s.alt < 100) s.alt = 100;
+      // 9. LEO Orbit Drag Decay Model
+      if (s.orbit.alt < 600) {
+        const H_base = 50.0;
+        const betaDrag = 0.0005;
+        const H = H_base * (1.0 + betaDrag * (weather.solarWindSpeed - 400));
+        const rho = 6e-12 * Math.exp(-(s.orbit.alt - 350.0) / H);
+        const kappa = 2.5e7;
+        const deltaAlt = - kappa * rho * Math.pow(s.orbit.velocity, 2) * 1.0;
+        s.orbit.alt = Math.max(100, s.orbit.alt + deltaAlt);
       }
     }
+
+    // 10. Sync root variables as aliases for Leaflet/Three.js/SGP4 compatibility
+    s.lat = s.orbit.lat;
+    s.lng = s.orbit.lng;
+    s.alt = s.orbit.alt;
+    s.velocity = s.orbit.velocity;
   });
 
   // Reset threat level of all satellites to NORMAL first

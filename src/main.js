@@ -102,17 +102,118 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Offline client-side SGP4 propagator execution
     const sats = store.getState().satellites;
+    const weather = store.getState().spaceWeather || { solarWindSpeed: 420, solarProtonFlux: 12.5, kpIndex: 3.2 };
+    
     const updatedSats = sats.map((s, index) => {
-      const offset = s.burnAdjustments ? s.burnAdjustments.alt : 0;
+      // Initialize nested subsystem states offline if missing
+      if (!s.orbit) {
+        s.orbit = {
+          lat: s.lat || 15.3421,
+          lng: s.lng || 75.8922,
+          alt: s.alt || 405.23,
+          velocity: s.velocity || 7.67,
+          inEclipse: false,
+          burnAdjustments: s.burnAdjustments || { alt: 0 }
+        };
+      }
+      if (!s.thermal) {
+        const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
+        s.thermal = {
+          battTemp: isDebris ? 0.0 : 28.5,
+          expectedBattTemp: isDebris ? 0.0 : 28.5,
+          radiatorEfficiency: isDebris ? 0.0 : 0.95,
+          thermalStress: 0.0
+        };
+      }
+      if (!s.power) {
+        const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
+        s.power = {
+          solarV: isDebris ? 0.0 : 32.4,
+          solarGenerationW: isDebris ? 0.0 : 280.0,
+          batterySoC: isDebris ? 0.0 : 92.5,
+          powerConsumptionW: isDebris ? 0.0 : 120.0
+        };
+      }
+      if (!s.communications) {
+        const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
+        s.communications = {
+          downlinkSNR: isDebris ? 0.0 : 24.5,
+          signalQuality: isDebris ? 0.0 : 0.98
+        };
+      }
+      if (!s.radiation) {
+        const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
+        s.radiation = {
+          cumulativeDoseRad: isDebris ? 0.0 : 4.12,
+          seuProbability: isDebris ? 0.0 : 0.0001,
+          seuCount: 0
+        };
+      }
+      if (!s.propulsion) {
+        const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
+        s.propulsion = {
+          fuelPressurePsi: isDebris ? 0.0 : 220.0,
+          propellantMassKg: isDebris ? 0.0 : 400.0
+        };
+      }
+
+      const offset = s.orbit.burnAdjustments ? s.orbit.burnAdjustments.alt : 0;
       const res = propagateSatellite(s.tle1, s.tle2, simTime, offset, index);
       
       // Update values in-place
-      s.lat = res.lat;
-      s.lng = res.lng;
-      s.alt = res.alt;
-      s.velocity = res.velocity;
+      s.orbit.lat = res.lat;
+      s.orbit.lng = res.lng;
+      s.orbit.alt = res.alt;
+      s.orbit.velocity = res.velocity;
       s.position3d = res.position3d;
       
+      const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
+      if (!isDebris) {
+        // Run simple physics offline so the UI still displays cool active changes
+        const rad = Math.PI / 180;
+        const sunLng = ((Date.now() / 240000) * 360) % 360;
+        const cosPhi = Math.cos(s.orbit.lat * rad) * Math.cos((s.orbit.lng - sunLng) * rad);
+        const sinPhi = Math.sqrt(1 - cosPhi * cosPhi);
+        const isBehindEarth = cosPhi < 0;
+        const isShadowBlocked = (6378.137 + s.orbit.alt) * sinPhi < 6378.137;
+        s.orbit.inEclipse = isBehindEarth && isShadowBlocked;
+
+        const cosTheta = s.orbit.inEclipse ? 0.0 : Math.max(0.1, cosPhi);
+        s.power.solarGenerationW = s.orbit.inEclipse ? 0.0 : parseFloat((280.0 * cosTheta).toFixed(1));
+        s.power.solarV = s.orbit.inEclipse ? 0.0 : parseFloat((30.0 + 4.1 * cosTheta + (Math.random() - 0.5) * 0.3).toFixed(2));
+        const netPower = s.power.solarGenerationW - s.power.powerConsumptionW;
+        s.power.batterySoC = parseFloat(Math.max(0, Math.min(100, s.power.batterySoC + netPower / 1000.0)).toFixed(2));
+
+        const T_space = 3.0;
+        const sigma = 5.67e-8;
+        const T_kelvin = s.thermal.battTemp + 273.15;
+        const Q_in = (s.power.powerConsumptionW * 0.15) + (s.orbit.inEclipse ? 0.0 : 180.0);
+        const Q_out = sigma * s.thermal.radiatorEfficiency * 1.5 * (Math.pow(T_kelvin, 4) - Math.pow(T_space, 4));
+        const dT = ((Q_in - Q_out) / 25000.0) * 60;
+        s.thermal.battTemp = parseFloat(Math.max(-50, Math.min(100, s.thermal.battTemp + dT)).toFixed(2));
+        s.thermal.expectedBattTemp = s.thermal.battTemp;
+        s.thermal.thermalStress = 0.0;
+
+        const gamma = 1e-5;
+        s.radiation.cumulativeDoseRad = parseFloat((s.radiation.cumulativeDoseRad + gamma * weather.solarProtonFlux).toFixed(4));
+        const P_seu = 0.00005 * weather.solarProtonFlux * Math.exp(weather.kpIndex / 3.0);
+        s.radiation.seuProbability = parseFloat(Math.min(1.0, P_seu).toFixed(5));
+        if (Math.random() < P_seu) {
+          s.radiation.seuCount++;
+        }
+
+        const noise = (Math.random() - 0.5) * 1.0;
+        s.communications.downlinkSNR = parseFloat((26.5 - weather.kpIndex * 2.2 + noise).toFixed(1));
+        s.communications.downlinkSNR = Math.max(5.0, Math.min(30.0, s.communications.downlinkSNR));
+        s.communications.signalQuality = parseFloat((s.communications.downlinkSNR / 30.0).toFixed(2));
+        s.propulsion.fuelPressurePsi = parseFloat(Math.max(10.0, s.propulsion.fuelPressurePsi + (Math.random() - 0.5) * 0.3).toFixed(1));
+      }
+
+      s.lat = s.orbit.lat;
+      s.lng = s.orbit.lng;
+      s.alt = s.orbit.alt;
+      s.velocity = s.orbit.velocity;
+
       return s;
     });
 
@@ -166,6 +267,7 @@ function setupWebsocketConnection() {
 
     socket.onopen = () => {
       useWebsocket = true;
+      store.isOnline = true;
       store.addLog('ISTRAC server downlink synchronized.', 'success');
       document.getElementById('lbl-ws-status').textContent = 'UPLINK OK';
       document.getElementById('lbl-ws-status').className = 'metric-value normal';
@@ -186,7 +288,7 @@ function setupWebsocketConnection() {
           const localSat = currentLocal.find(s => s.id === serverSat.id);
           
           // Pre-propagate coordinates on client as fallback
-          const offset = (localSat && localSat.burnAdjustments) ? localSat.burnAdjustments.alt : 0;
+          const offset = (localSat && localSat.orbit && localSat.orbit.burnAdjustments) ? localSat.orbit.burnAdjustments.alt : ((localSat && localSat.burnAdjustments) ? localSat.burnAdjustments.alt : 0);
           const res = propagateSatellite(serverSat.tle1, serverSat.tle2, store.getState().simTime, offset, idx);
 
           if (localSat) {
@@ -198,7 +300,13 @@ function setupWebsocketConnection() {
             localSat.threatDetails = serverSat.threatDetails;
             localSat.category = serverSat.category || localSat.category;
             localSat.position3d = res.position3d;
-            if (serverSat.health) localSat.health = serverSat.health;
+            
+            if (serverSat.orbit) localSat.orbit = serverSat.orbit;
+            if (serverSat.thermal) localSat.thermal = serverSat.thermal;
+            if (serverSat.power) localSat.power = serverSat.power;
+            if (serverSat.communications) localSat.communications = serverSat.communications;
+            if (serverSat.radiation) localSat.radiation = serverSat.radiation;
+            if (serverSat.propulsion) localSat.propulsion = serverSat.propulsion;
             return localSat;
           } else {
             // New satellite added dynamically, propagate initial coordinates
@@ -264,6 +372,7 @@ function setupWebsocketConnection() {
 function handleConnectionFailure() {
   useWebsocket = false;
   socket = null;
+  store.isOnline = false;
   document.getElementById('lbl-ws-status').textContent = 'LOCAL STANDALONE';
   document.getElementById('lbl-ws-status').className = 'metric-value warning';
 }

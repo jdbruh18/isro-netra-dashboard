@@ -25,11 +25,38 @@ const DEFAULT_SATELLITES = [
     tle1: "1 99901U 26001A   26155.50000000  .00020000  00000-0  10000-3 0  9991",
     tle2: "2 99901  51.6400 120.5000 0005000  30.0000 330.0000 15.60000000    12",
     category: "indian",
-    health: {
-      solarV: 32.4,
+    orbit: {
+      lat: 15.3421,
+      lng: 75.8922,
+      alt: 405.23,
+      velocity: 7.67,
+      inEclipse: false,
+      burnAdjustments: { alt: 0 }
+    },
+    thermal: {
       battTemp: 28.5,
+      expectedBattTemp: 28.5,
+      radiatorEfficiency: 0.95,
+      thermalStress: 0.0
+    },
+    power: {
+      solarV: 32.4,
+      solarGenerationW: 280.0,
+      batterySoC: 92.5,
+      powerConsumptionW: 120.0
+    },
+    communications: {
       downlinkSNR: 24.5,
-      fuelPressure: 220
+      signalQuality: 0.98
+    },
+    radiation: {
+      cumulativeDoseRad: 4.12,
+      seuProbability: 0.0001,
+      seuCount: 0
+    },
+    propulsion: {
+      fuelPressurePsi: 220.0,
+      propellantMassKg: 400.0
     }
   },
   {
@@ -46,11 +73,38 @@ const DEFAULT_SATELLITES = [
     tle1: "1 99902U 21000A   26155.49900000  .00030000  00000-0  20000-3 0  9995",
     tle2: "2 99902  51.6420 120.4850 0005200  28.0000 332.0000 15.60150000    16",
     category: "debris",
-    health: {
-      solarV: 0.0,
+    orbit: {
+      lat: 15.3510,
+      lng: 75.8990,
+      alt: 405.41,
+      velocity: 7.68,
+      inEclipse: false,
+      burnAdjustments: { alt: 0 }
+    },
+    thermal: {
       battTemp: 0.0,
+      expectedBattTemp: 0.0,
+      radiatorEfficiency: 0.0,
+      thermalStress: 0.0
+    },
+    power: {
+      solarV: 0.0,
+      solarGenerationW: 0.0,
+      batterySoC: 0.0,
+      powerConsumptionW: 0.0
+    },
+    communications: {
       downlinkSNR: 0.0,
-      fuelPressure: 0.0
+      signalQuality: 0.0
+    },
+    radiation: {
+      cumulativeDoseRad: 0.0,
+      seuProbability: 0.0,
+      seuCount: 0
+    },
+    propulsion: {
+      fuelPressurePsi: 0.0,
+      propellantMassKg: 0.0
     }
   },
   {
@@ -67,11 +121,38 @@ const DEFAULT_SATELLITES = [
     tle1: "1 44804U 19081A   26155.50000000  .00001000  00000-0  50000-4 0  9992",
     tle2: "2 44804  97.4000 230.1200 0012000  90.0000 270.0000 15.20000000    13",
     category: "indian",
-    health: {
-      solarV: 31.8,
+    orbit: {
+      lat: -40.1245,
+      lng: 130.4512,
+      alt: 509.15,
+      velocity: 7.61,
+      inEclipse: false,
+      burnAdjustments: { alt: 0 }
+    },
+    thermal: {
       battTemp: 27.2,
+      expectedBattTemp: 27.2,
+      radiatorEfficiency: 0.95,
+      thermalStress: 0.0
+    },
+    power: {
+      solarV: 31.8,
+      solarGenerationW: 240.0,
+      batterySoC: 88.0,
+      powerConsumptionW: 100.0
+    },
+    communications: {
       downlinkSNR: 22.8,
-      fuelPressure: 180
+      signalQuality: 0.97
+    },
+    radiation: {
+      cumulativeDoseRad: 3.54,
+      seuProbability: 0.00008,
+      seuCount: 0
+    },
+    propulsion: {
+      fuelPressurePsi: 180.0,
+      propellantMassKg: 300.0
     }
   },
   {
@@ -88,11 +169,38 @@ const DEFAULT_SATELLITES = [
     tle1: "1 43286U 18035A   26155.50000000  .00000100  00000-0  00000-0 0  9993",
     tle2: "2 43286  29.0000  80.2000 0020000 180.0000 180.0000  1.00270000    14",
     category: "indian",
-    health: {
-      solarV: 34.1,
+    orbit: {
+      lat: 10.4512,
+      lng: 80.1245,
+      alt: 35786.11,
+      velocity: 3.08,
+      inEclipse: false,
+      burnAdjustments: { alt: 0 }
+    },
+    thermal: {
       battTemp: 29.8,
+      expectedBattTemp: 29.8,
+      radiatorEfficiency: 0.95,
+      thermalStress: 0.0
+    },
+    power: {
+      solarV: 34.1,
+      solarGenerationW: 450.0,
+      batterySoC: 95.0,
+      powerConsumptionW: 180.0
+    },
+    communications: {
       downlinkSNR: 25.1,
-      fuelPressure: 450
+      signalQuality: 0.99
+    },
+    radiation: {
+      cumulativeDoseRad: 12.8,
+      seuProbability: 0.0005,
+      seuCount: 0
+    },
+    propulsion: {
+      fuelPressurePsi: 450.0,
+      propellantMassKg: 800.0
     }
   }
 ];

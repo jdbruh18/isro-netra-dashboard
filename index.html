@@ -113,25 +113,43 @@
                 <span class="sat-details-val normal" id="sat-detail-status">ORBIT OK</span>
               </div>
               
-              <!-- Spacecraft Health Diagnostics (Sprint 4) -->
+              <!-- Spacecraft Digital Twin Subsystems (V3.1) -->
               <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.05);">
-                <div style="font-size: 0.6rem; color: #64748b; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px;">Subsystem Diagnostics</div>
+                <div style="font-size: 0.6rem; color: #64748b; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px;">Digital Twin Subsystems</div>
                 <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <!-- Orbit Subsystem -->
                   <div class="sat-details-row">
-                    <span class="sat-details-lbl">Solar Array Output</span>
-                    <span class="sat-details-val" id="sat-detail-solar">32.4 V</span>
+                    <span class="sat-details-lbl">Eclipse State</span>
+                    <span class="sat-details-val" id="sat-detail-eclipse">SUNLIGHT</span>
+                  </div>
+                  <!-- Power Subsystem -->
+                  <div class="sat-details-row">
+                    <span class="sat-details-lbl">Solar Array / Gen</span>
+                    <span class="sat-details-val"><span id="sat-detail-solar">32.4 V</span> / <span id="sat-detail-solar-gen">280 W</span></span>
                   </div>
                   <div class="sat-details-row">
-                    <span class="sat-details-lbl">Battery Temp</span>
-                    <span class="sat-details-val" id="sat-detail-batt-temp">28.5°C</span>
+                    <span class="sat-details-lbl">Battery SoC</span>
+                    <span class="sat-details-val" id="sat-detail-soc">92.5%</span>
                   </div>
+                  <!-- Thermal Subsystem -->
+                  <div class="sat-details-row">
+                    <span class="sat-details-lbl">Battery Temp / Stress</span>
+                    <span class="sat-details-val"><span id="sat-detail-batt-temp">28.5°C</span> / <span id="sat-detail-thermal-stress">0.0°C</span></span>
+                  </div>
+                  <!-- Comms Subsystem -->
                   <div class="sat-details-row">
                     <span class="sat-details-lbl">Comms Link SNR</span>
                     <span class="sat-details-val" id="sat-detail-snr">24.5 dB</span>
                   </div>
+                  <!-- Radiation Subsystem -->
                   <div class="sat-details-row">
-                    <span class="sat-details-lbl">Fuel Pressure</span>
-                    <span class="sat-details-val" id="sat-detail-fuel">220 psi</span>
+                    <span class="sat-details-lbl">Rad Dose / SEU Count</span>
+                    <span class="sat-details-val"><span id="sat-detail-radiation">4.12 Rad</span> / <span id="sat-detail-seu">0 SEU</span></span>
+                  </div>
+                  <!-- Propulsion Subsystem -->
+                  <div class="sat-details-row">
+                    <span class="sat-details-lbl">Fuel Mass / Pressure</span>
+                    <span class="sat-details-val"><span id="sat-detail-propellant-mass">400.0 kg</span> / <span id="sat-detail-fuel">220 psi</span></span>
                   </div>
                 </div>
               </div>
