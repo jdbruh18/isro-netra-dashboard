@@ -224,6 +224,17 @@ class StateStore {
       const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
       if (isDebris) return;
 
+      if (!s.anomalies) {
+        s.anomalies = {
+          activeList: [],
+          predictions: {
+            batteryDepletionTimeSec: -1,
+            criticalThermalTimeSec: -1,
+            atmosphericReentryTimeSec: -1
+          }
+        };
+      }
+
       if (s.orbit && s.power && s.thermal && s.communications && s.radiation && s.propulsion) {
         // Run simple physics simulation updates locally
         const rad = Math.PI / 180;
@@ -263,6 +274,64 @@ class StateStore {
         s.communications.downlinkSNR = Math.max(5.0, Math.min(30.0, s.communications.downlinkSNR));
         s.communications.signalQuality = parseFloat((s.communications.downlinkSNR / 30.0).toFixed(2));
         s.propulsion.fuelPressurePsi = parseFloat(Math.max(10.0, s.propulsion.fuelPressurePsi + (Math.random() - 0.5) * 0.3).toFixed(1));
+
+        // Calculate drag decay rate locally for prediction countdowns
+        let deltaAlt = 0;
+        if (s.orbit.alt < 600) {
+          const H_base = 50.0;
+          const betaDrag = 0.0005;
+          const H = H_base * (1.0 + betaDrag * (weather.solarWindSpeed - 400));
+          const rho = 6e-12 * Math.exp(-(s.orbit.alt - 350.0) / H);
+          const kappa = 2.5e7;
+          deltaAlt = - kappa * rho * Math.pow(s.orbit.velocity, 2) * 1.0;
+        }
+
+        // 9.1 Local Anomaly Detection and Predictions (V3.4)
+        const isStorm = weather.solarProtonFlux > 15.0 || weather.kpIndex >= 4.5;
+        const activeAnomalies = [];
+        
+        if (s.thermal.thermalStress > 5.0) {
+          activeAnomalies.push("THERMAL_STRESS_ANOMALY");
+        }
+        if (s.power.batterySoC < 20.0) {
+          activeAnomalies.push("LOW_POWER_ANOMALY");
+        }
+        if (s.communications.downlinkSNR < 12.0 && isStorm) {
+          activeAnomalies.push("IONOSPHERIC_SCINTILLATION_ANOMALY");
+        }
+        if (s.orbit.alt < 600.0 && weather.solarWindSpeed > 500.0 && deltaAlt < -0.005) {
+          activeAnomalies.push("DRAG_DECAY_ANOMALY");
+        }
+        if (s.radiation.seuProbability > 0.01) {
+          activeAnomalies.push("RADIATION_SEU_RISK");
+        }
+
+        let depletionTime = -1;
+        const deltaSoC = netPower / 1000.0;
+        if (deltaSoC < 0) {
+          depletionTime = parseFloat((s.power.batterySoC / -deltaSoC).toFixed(1));
+        }
+
+        let thermalTime = -1;
+        if (dT > 0) {
+          thermalTime = parseFloat(((48.0 - s.thermal.battTemp) / dT).toFixed(1));
+          if (thermalTime < 0) thermalTime = 0;
+        }
+
+        let reentryTime = -1;
+        if (s.orbit.alt < 600.0 && deltaAlt < 0) {
+          reentryTime = parseFloat(((s.orbit.alt - 150.0) / -deltaAlt).toFixed(1));
+          if (reentryTime < 0) reentryTime = 0;
+        }
+
+        s.anomalies = {
+          activeList: activeAnomalies,
+          predictions: {
+            batteryDepletionTimeSec: depletionTime,
+            criticalThermalTimeSec: thermalTime,
+            atmosphericReentryTimeSec: reentryTime
+          }
+        };
       }
     });
 
