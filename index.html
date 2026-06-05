@@ -223,23 +223,34 @@
 
       <!-- Bottom-Left Panel: Telemetry Console -->
       <section class="hud-panel panel-terminal" id="panel-telemetry-console">
-        <div class="panel-header">
-          <h2 class="panel-title">
-            <i data-lucide="terminal" style="width: 16px; height: 16px;"></i>
-            ISTRAC Telemetry & Control Uplink
-          </h2>
+        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; gap: 15px; align-items: center;">
+            <h2 class="panel-title" id="tab-terminal-btn" style="cursor: pointer; opacity: 1; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s;">
+              <i data-lucide="terminal" style="width: 16px; height: 16px;"></i>
+              ISTRAC Uplink Console
+            </h2>
+            <h2 class="panel-title" id="tab-history-btn" style="cursor: pointer; opacity: 0.5; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s;">
+              <i data-lucide="history" style="width: 16px; height: 16px;"></i>
+              Maneuver History Log
+            </h2>
+          </div>
           <div style="font-family: var(--font-mono); font-size: 0.65rem; color: #64748b;">
             Downlink Feed: <span style="color: hsl(var(--color-green));" id="lbl-ws-status">LOCAL OK</span>
           </div>
         </div>
-        <div class="panel-content">
+        <div class="panel-content" style="position: relative; display: flex; flex-direction: column; height: 100%;">
           <!-- Terminal output scroll box -->
-          <div class="terminal-screen" id="terminal-screen-container">
+          <div class="terminal-screen" id="terminal-screen-container" style="flex: 1; overflow-y: auto;">
             <!-- Logging lines rendered dynamically -->
           </div>
           
+          <!-- Maneuver History Log Container -->
+          <div id="maneuver-history-container" style="display: none; flex: 1; overflow-y: auto; padding: 10px; font-family: var(--font-mono); font-size: 0.65rem; color: #e2e8f0; background: rgba(5, 7, 12, 0.4); border: 1px solid rgba(100, 116, 139, 0.2); border-radius: 4px; margin-bottom: 10px;">
+            <div style="text-align: center; color: #64748b; margin-top: 20px;">No orbital maneuvers recorded.</div>
+          </div>
+          
           <!-- Input command field -->
-          <div class="terminal-input-row">
+          <div class="terminal-input-row" id="terminal-input-row-container">
             <input type="text" class="terminal-input-box" id="inp-terminal-command" placeholder="Enter ISTRAC telemetry command (e.g. '/diagnose', '/burn gaganyaan 1.25', '/clear_logs')..." />
             <button id="btn-terminal-submit" class="hud-btn">UPLINK</button>
           </div>

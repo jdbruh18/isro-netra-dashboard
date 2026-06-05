@@ -273,7 +273,7 @@ async function queryGeminiAgent(message, typingId) {
           store.updateState('satellites', [...sats]);
           
           store.addAgentLog("execute_orbital_burn", { satelliteId: topConjunction.activeId, deltaV: reqDeltaV, direction: "PROGRADE" }, { status: "SUCCESS" });
-          store.addLog(`[UPLINK] Maneuver executed: PROGRADE burn of ${reqDeltaV} m/s. Orbit adjusted by +${altShift.toFixed(2)}km. (Gemini Local Simulation)`, 'success');
+          store.addLog(`[UPLINK] Maneuver executed on ${targetSat.name}: PROGRADE burn of ${reqDeltaV} m/s. Orbit adjusted by +${altShift.toFixed(2)}km. (Gemini Local Simulation)`, 'success');
           audio.playSuccess();
 
           reply = `**Collision Shield Activated (Consensus: CLEAR)**\n\nI initiated autonomous threat mitigation steps for **${topConjunction.activeName}**:\n1. Invoked \`calculate_avoidance_vector\` (Recommended: **${reqDeltaV} m/s** PROGRADE).\n2. Consulted **Aditya Solar Physics Analyst** (Clear).\n3. Executed \`execute_orbital_burn\` on **${topConjunction.activeName}**.\n4. Orbit raised by **+${altShift.toFixed(2)} km**, successfully evading **${topConjunction.debrisName}**.`;

@@ -19,6 +19,78 @@ app.use(express.static(__dirname));
 // Default port for Google Cloud Run is 8080
 const PORT = process.env.PORT || 8080;
 
+// NOAA Space Weather Prediction Center API Feeds
+let isStormOverride = false;
+
+async function fetchNOAASpaceWeather() {
+  try {
+    // 1. Kp Index (Planetary K-index)
+    const kpRes = await fetch('https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json');
+    const kpData = await kpRes.json();
+    let kpVal = 3.0;
+    if (kpData && kpData.length > 0) {
+      const latest = kpData[kpData.length - 1];
+      if (latest && latest.Kp !== undefined) kpVal = parseFloat(latest.Kp);
+    }
+    
+    // 2. Solar Wind Plasma (DSCOVR solar wind speed)
+    const plasmaRes = await fetch('https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json');
+    const plasmaData = await plasmaRes.json();
+    let windVal = 400.0;
+    if (plasmaData && plasmaData.length > 0) {
+      for (let i = plasmaData.length - 1; i >= 1; i--) {
+        const row = plasmaData[i];
+        if (row && row[2] && !isNaN(parseFloat(row[2]))) {
+          windVal = parseFloat(row[2]);
+          break;
+        }
+      }
+    }
+    
+    // 3. Solar Wind Magnetic Field (DSCOVR Magnetometer)
+    const magRes = await fetch('https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json');
+    const magData = await magRes.json();
+    let magX = 0.0, magY = 0.0, magZ = 0.0;
+    if (magData && magData.length > 0) {
+      for (let i = magData.length - 1; i >= 1; i--) {
+        const row = magData[i];
+        if (row && row[1] && row[2] && row[3]) {
+          magX = parseFloat(row[1]);
+          magY = parseFloat(row[2]);
+          magZ = parseFloat(row[3]);
+          break;
+        }
+      }
+    }
+    
+    // 4. GOES Proton Flux (Integral protons >=10 MeV)
+    const protonRes = await fetch('https://services.swpc.noaa.gov/json/goes/primary/integral-protons-1-day.json');
+    const protonData = await protonRes.json();
+    let protonVal = 10.0;
+    if (protonData && protonData.length > 0) {
+      const tenMevList = protonData.filter(p => p.energy === '>=10 MeV');
+      if (tenMevList.length > 0) {
+        protonVal = parseFloat(tenMevList[tenMevList.length - 1].flux || 10.0);
+      }
+    }
+    
+    // Update live values inside the telemetry memory store
+    if (!isStormOverride) {
+      serverTelemetry.spaceWeather.kpIndex = kpVal;
+      serverTelemetry.spaceWeather.solarWindSpeed = windVal;
+      serverTelemetry.spaceWeather.solarProtonFlux = protonVal;
+      serverTelemetry.spaceWeather.magX = magX;
+      serverTelemetry.spaceWeather.magY = magY;
+      serverTelemetry.spaceWeather.magZ = magZ;
+      serverTelemetry.spaceWeather.magneticStormLevel = kpVal >= 5.0 ? "SEVERE STORM" : "QUIET";
+      
+      console.log(`[NOAA API] Live space weather synced: Kp=${kpVal.toFixed(1)}, Wind=${windVal.toFixed(0)}km/s, Protons=${protonVal.toFixed(1)}pfu`);
+    }
+  } catch (err) {
+    console.error("[NOAA API] Failed to fetch live space weather feeds:", err.message);
+  }
+}
+
 // Centralized state store inside server memory for SGP4 synchronized streaming
 let serverTelemetry = {
   satellites: [
@@ -155,9 +227,19 @@ wss.on('connection', (ws) => {
         await executeManeuver(satelliteId, deltaV, direction, "External Agent Command");
       } else if (packet.action === "UPDATE_WEATHER") {
         const { solarProtonFlux, kpIndex, magneticStormLevel } = packet;
-        serverTelemetry.spaceWeather.solarProtonFlux = parseFloat(solarProtonFlux);
+        const fluxVal = parseFloat(solarProtonFlux);
+        serverTelemetry.spaceWeather.solarProtonFlux = fluxVal;
         if (kpIndex !== undefined) serverTelemetry.spaceWeather.kpIndex = parseFloat(kpIndex);
         if (magneticStormLevel !== undefined) serverTelemetry.spaceWeather.magneticStormLevel = magneticStormLevel;
+        
+        if (fluxVal > 15.0) {
+          isStormOverride = true;
+          console.log("[STORM OVERRIDE] Solar storm simulation active. NOAA live sync suspended.");
+        } else {
+          isStormOverride = false;
+          console.log("[STORM OVERRIDE] Solar storm simulation cleared. NOAA live sync resumed.");
+          fetchNOAASpaceWeather();
+        }
         
         // Broadcast telemetry update across all clients
         broadcastTelemetry("TELEMETRY_CLOCK_TICK", serverTelemetry);
@@ -203,7 +285,7 @@ async function executeManeuver(satId, deltaV, direction, source = "Manual Contro
   sat.threatLevel = "NORMAL";
   sat.threatDetails = `Orbit corrected by ${altShift.toFixed(2)}km. Collision risk mitigated.`;
 
-  const details = `Maneuver executed: ${direction} burn of ${deltaV} m/s. Orbit adjusted by +${altShift.toFixed(2)}km.`;
+  const details = `Maneuver executed on ${sat.name}: ${direction} burn of ${deltaV} m/s. Orbit adjusted by +${altShift.toFixed(2)}km.`;
   
   // Persist coordinate shift and log event to database
   try {
@@ -777,17 +859,26 @@ setInterval(() => {
     });
   });
   
-  // Tick weather parameters inside server memory
-  weather.solarWindSpeed += Math.floor((Math.random() - 0.5) * 6);
-  if (weather.solarWindSpeed < 300) weather.solarWindSpeed = 300;
-  if (weather.solarWindSpeed > 800) weather.solarWindSpeed = 800;
+  // Tick weather parameters inside server memory (only drift if storm override active)
+  if (isStormOverride) {
+    weather.solarWindSpeed += Math.floor((Math.random() - 0.5) * 6);
+    if (weather.solarWindSpeed < 300) weather.solarWindSpeed = 300;
+    if (weather.solarWindSpeed > 800) weather.solarWindSpeed = 800;
 
-  weather.solarProtonFlux += (Math.random() - 0.5) * 1.2;
-  if (weather.solarProtonFlux < 5) weather.solarProtonFlux = 5;
-  if (weather.solarProtonFlux > 150) weather.solarProtonFlux = 150;
+    weather.solarProtonFlux += (Math.random() - 0.5) * 1.2;
+    if (weather.solarProtonFlux < 5) weather.solarProtonFlux = 5;
+    if (weather.solarProtonFlux > 150) weather.solarProtonFlux = 150;
+  }
   
   broadcastTelemetry("TELEMETRY_CLOCK_TICK", serverTelemetry);
 }, 1000);
+
+// Periodically refresh NOAA space weather every 5 minutes
+setInterval(() => {
+  if (!isStormOverride) {
+    fetchNOAASpaceWeather();
+  }
+}, 300000);
 
 server.listen(PORT, async () => {
   // Initialize Database configurations on server startup
@@ -800,6 +891,9 @@ server.listen(PORT, async () => {
       serverTelemetry.satellites = sats;
       console.log(`Database sync complete: Loaded ${sats.length} space assets.`);
     }
+
+    // Fetch initial live NOAA space weather values
+    await fetchNOAASpaceWeather();
   } catch (err) {
     console.error("Database connection initialization failed on startup:", err);
   }

@@ -10,9 +10,53 @@ export function initTelemetryTerminal() {
 
   if (!logContainer) return;
 
+  // Tab switching UI elements
+  const tabTerminalBtn = document.getElementById('tab-terminal-btn');
+  const tabHistoryBtn = document.getElementById('tab-history-btn');
+  const terminalScreen = document.getElementById('terminal-screen-container');
+  const historyContainer = document.getElementById('maneuver-history-container');
+  const inputRow = document.getElementById('terminal-input-row-container');
+
+  let activeTab = 'terminal';
+
+  const updateTabViews = () => {
+    if (activeTab === 'terminal') {
+      if (tabTerminalBtn) tabTerminalBtn.style.opacity = '1';
+      if (tabHistoryBtn) tabHistoryBtn.style.opacity = '0.5';
+      if (terminalScreen) terminalScreen.style.display = 'block';
+      if (historyContainer) historyContainer.style.display = 'none';
+      if (inputRow) inputRow.style.display = 'flex';
+      if (terminalScreen) terminalScreen.scrollTop = terminalScreen.scrollHeight;
+    } else {
+      if (tabTerminalBtn) tabTerminalBtn.style.opacity = '0.5';
+      if (tabHistoryBtn) tabHistoryBtn.style.opacity = '1';
+      if (terminalScreen) terminalScreen.style.display = 'none';
+      if (historyContainer) historyContainer.style.display = 'block';
+      if (inputRow) inputRow.style.display = 'none';
+      renderManeuverHistory();
+    }
+  };
+
+  if (tabTerminalBtn && tabHistoryBtn) {
+    tabTerminalBtn.addEventListener('click', () => {
+      audio.playClick();
+      activeTab = 'terminal';
+      updateTabViews();
+    });
+
+    tabHistoryBtn.addEventListener('click', () => {
+      audio.playClick();
+      activeTab = 'history';
+      updateTabViews();
+    });
+  }
+
   // 1. Subscribe to state log events
   store.subscribe('telemetryLogs', (logs) => {
     renderTerminalLogs(logs);
+    if (activeTab === 'history') {
+      renderManeuverHistory();
+    }
   });
 
   // 2. Submit Action Command handlers
@@ -178,7 +222,7 @@ function parseUplinkCommand(command) {
         target.threatDetails = 'Orbit shifted. Conjunction threat cleared.';
         
         store.updateState('satellites', [...sats]);
-        store.addLog(`[UPLINK SUCCESS] ${target.name} orbit raised by +${altShift.toFixed(2)} km.`, 'success');
+        store.addLog(`[UPLINK] Maneuver executed on ${target.name}: PROGRADE burn of ${deltaV.toFixed(2)} m/s. Orbit adjusted by +${altShift.toFixed(2)}km. (Manual Control)`, 'success');
         audio.playSuccess();
 
         // Dispatch custom event to notify main websocket controller of manual thrust command
@@ -196,4 +240,73 @@ function parseUplinkCommand(command) {
       store.addLog(`Command "${baseCmd}" not recognized. Type "/help" to view command registry.`, 'danger');
       break;
   }
+}
+
+function renderManeuverHistory() {
+  const container = document.getElementById('maneuver-history-container');
+  if (!container) return;
+
+  const logs = store.getState().telemetryLogs || [];
+  
+  // Filter logs for maneuvers using the regex
+  const regex = /Maneuver executed on\s+([^:]+):\s+(\w+)\s+burn of\s+([\d.]+)\s+m\/s\.\s+Orbit adjusted by\s+\+?([\d.-]+)km\.\s*(?:\(([^)]+)\))?/;
+  
+  const maneuvers = [];
+  
+  logs.forEach(log => {
+    const match = log.text.match(regex);
+    if (match) {
+      maneuvers.push({
+        timestamp: log.timestamp,
+        satellite: match[1].trim(),
+        direction: match[2].trim(),
+        deltaV: parseFloat(match[3]),
+        shift: parseFloat(match[4]),
+        source: match[5] ? match[5].trim() : 'Manual Control'
+      });
+    }
+  });
+
+  if (maneuvers.length === 0) {
+    container.innerHTML = `<div style="text-align: center; color: #64748b; margin-top: 25px;">No orbital maneuvers recorded in session.</div>`;
+    return;
+  }
+
+  let html = `
+    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.65rem;">
+      <thead>
+        <tr style="border-bottom: 1px solid rgba(100, 116, 139, 0.4); color: #64748b; text-transform: uppercase;">
+          <th style="padding: 6px 4px;">Time</th>
+          <th style="padding: 6px 4px;">Space Asset</th>
+          <th style="padding: 6px 4px;">Direction</th>
+          <th style="padding: 6px 4px;">Delta-V</th>
+          <th style="padding: 6px 4px;">Orbit Shift</th>
+          <th style="padding: 6px 4px;">Initiated By</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  maneuvers.reverse().forEach(m => {
+    const isAI = m.source.includes('Gemini') || m.source.includes('Agent');
+    const sourceColor = isAI ? 'rgb(168, 85, 247)' : 'rgb(6, 182, 212)';
+    
+    html += `
+      <tr style="border-bottom: 1px solid rgba(100, 116, 139, 0.15);">
+        <td style="padding: 6px 4px; color: #64748b;">${m.timestamp}</td>
+        <td style="padding: 6px 4px; font-weight: bold; color: #fff;">${m.satellite}</td>
+        <td style="padding: 6px 4px; color: hsl(var(--color-amber));">${m.direction}</td>
+        <td style="padding: 6px 4px; font-family: var(--font-mono); color: #fff;">${m.deltaV.toFixed(2)} m/s</td>
+        <td style="padding: 6px 4px; font-family: var(--font-mono); color: hsl(var(--color-green));">+${m.shift.toFixed(2)} km</td>
+        <td style="padding: 6px 4px; color: ${sourceColor}; font-weight: 500;">${m.source}</td>
+      </tr>
+    `;
+  });
+
+  html += `
+      </tbody>
+    </table>
+  `;
+
+  container.innerHTML = html;
 }
