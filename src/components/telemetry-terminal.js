@@ -14,8 +14,11 @@ export function initTelemetryTerminal() {
   // Tab switching UI elements
   const tabTerminalBtn = document.getElementById('tab-terminal-btn');
   const tabHistoryBtn = document.getElementById('tab-history-btn');
+  const tabChartsBtn = document.getElementById('tab-charts-btn');
+  
   const terminalScreen = document.getElementById('terminal-screen-container');
   const historyContainer = document.getElementById('maneuver-history-container');
+  const chartsContainer = document.getElementById('subsystem-charts-container');
   const inputRow = document.getElementById('terminal-input-row-container');
 
   let activeTab = 'terminal';
@@ -24,30 +27,55 @@ export function initTelemetryTerminal() {
     if (activeTab === 'terminal') {
       if (tabTerminalBtn) tabTerminalBtn.style.opacity = '1';
       if (tabHistoryBtn) tabHistoryBtn.style.opacity = '0.5';
+      if (tabChartsBtn) tabChartsBtn.style.opacity = '0.5';
       if (terminalScreen) terminalScreen.style.display = 'block';
       if (historyContainer) historyContainer.style.display = 'none';
+      if (chartsContainer) chartsContainer.style.display = 'none';
       if (inputRow) inputRow.style.display = 'flex';
       if (terminalScreen) terminalScreen.scrollTop = terminalScreen.scrollHeight;
-    } else {
+    } else if (activeTab === 'history') {
       if (tabTerminalBtn) tabTerminalBtn.style.opacity = '0.5';
       if (tabHistoryBtn) tabHistoryBtn.style.opacity = '1';
+      if (tabChartsBtn) tabChartsBtn.style.opacity = '0.5';
       if (terminalScreen) terminalScreen.style.display = 'none';
       if (historyContainer) historyContainer.style.display = 'block';
+      if (chartsContainer) chartsContainer.style.display = 'none';
       if (inputRow) inputRow.style.display = 'none';
       renderManeuverHistory();
+    } else if (activeTab === 'charts') {
+      if (tabTerminalBtn) tabTerminalBtn.style.opacity = '0.5';
+      if (tabHistoryBtn) tabHistoryBtn.style.opacity = '0.5';
+      if (tabChartsBtn) tabChartsBtn.style.opacity = '1';
+      if (terminalScreen) terminalScreen.style.display = 'none';
+      if (historyContainer) historyContainer.style.display = 'none';
+      if (chartsContainer) chartsContainer.style.display = 'flex';
+      if (inputRow) inputRow.style.display = 'none';
+      
+      // Dispatch custom event to let the charting module know the tab is active
+      document.dispatchEvent(new CustomEvent('subsystem-charts-activated'));
     }
   };
 
-  if (tabTerminalBtn && tabHistoryBtn) {
+  if (tabTerminalBtn) {
     tabTerminalBtn.addEventListener('click', () => {
       audio.playClick();
       activeTab = 'terminal';
       updateTabViews();
     });
+  }
 
+  if (tabHistoryBtn) {
     tabHistoryBtn.addEventListener('click', () => {
       audio.playClick();
       activeTab = 'history';
+      updateTabViews();
+    });
+  }
+
+  if (tabChartsBtn) {
+    tabChartsBtn.addEventListener('click', () => {
+      audio.playClick();
+      activeTab = 'charts';
       updateTabViews();
     });
   }

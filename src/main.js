@@ -10,6 +10,7 @@ import { initTelemetryTerminal } from './components/telemetry-terminal.js';
 import { initAgentConsole } from './components/agent-console.js';
 import { initCollisionMonitor } from './components/collision-monitor.js';
 import { initGroundTrackMap, invalidateMapSize } from './components/ground-track.js';
+import { initSubsystemCharts } from './components/telemetry-charts.js';
 
 let socket = null;
 let useWebsocket = false;
@@ -89,6 +90,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initCollisionMonitor();
   initAgentConsole(socket, useWebsocket);
   initGroundTrackMap();
+  initSubsystemCharts();
 
   // 7.5. Bind Search and Filter Events
   bindSearchAndFilterEvents();

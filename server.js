@@ -4,7 +4,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { initializeDb, getSatellites, saveSatellite, saveLog, saveAgentAction } from './db.js';
+import { initializeDb, getSatellites, saveSatellite, saveLog, saveAgentAction, saveTelemetryHistory, getTelemetryHistory } from './db.js';
 import { validateBurn } from './src/core/avoidance-proof.js';
 import { validatePowerState, validateThrusterFuel, validateADCSState } from './src/core/subsystem-safety-proof.js';
 
@@ -300,6 +300,9 @@ let serverTelemetry = {
   }
 };
 
+// Rolling telemetry buffer mapping satelliteId to arrays of recent points
+let serverTelemetryHistory = {};
+
 // List of connected WebSocket agent clients
 const clients = new Set();
 
@@ -467,6 +470,25 @@ async function executeManeuver(satId, deltaV, direction, source = "Manual Contro
 // REST Endpoint: Get current telemetry states
 app.get('/api/telemetry', (req, res) => {
   res.json(serverTelemetry);
+});
+
+// REST Endpoint: Get historical telemetry for a satellite
+app.get('/api/telemetry/history', async (req, res) => {
+  const { satelliteId, limit } = req.query;
+  const satId = satelliteId || 'gaganyaan';
+  const limitVal = parseInt(limit) || 50;
+
+  try {
+    const dbHistory = await getTelemetryHistory(satId, limitVal);
+    if (dbHistory && dbHistory.length > 0) {
+      return res.json(dbHistory);
+    }
+  } catch (err) {
+    console.error("Failed to fetch history from database, falling back to server memory", err);
+  }
+
+  const memHistory = serverTelemetryHistory[satId] || [];
+  res.json(memHistory.slice(-limitVal));
 });
 
 // REST Endpoint: Proxy Search query to CelesTrak to prevent client CORS blocks
@@ -1189,6 +1211,28 @@ setInterval(() => {
     s.lng = s.orbit.lng;
     s.alt = s.orbit.alt;
     s.velocity = s.orbit.velocity;
+
+    // Save history point to rolling local memory buffer
+    const historyPoint = {
+      timestamp: new Date().toISOString(),
+      batterySoC: s.power ? s.power.batterySoC : 0.0,
+      batteryTemp: s.thermal ? s.thermal.battTemp : 0.0,
+      altitude: s.orbit ? s.orbit.alt : s.alt,
+      downlinkSNR: s.communications ? s.communications.downlinkSNR : 0.0
+    };
+
+    if (!serverTelemetryHistory[s.id]) {
+      serverTelemetryHistory[s.id] = [];
+    }
+    serverTelemetryHistory[s.id].push(historyPoint);
+    if (serverTelemetryHistory[s.id].length > 50) {
+      serverTelemetryHistory[s.id].shift();
+    }
+
+    // Persist historical point asynchronously
+    saveTelemetryHistory(s).catch(err => {
+      // Slient fallback to keep tick performance high
+    });
   });
 
   // Reset threat level of all satellites to NORMAL first

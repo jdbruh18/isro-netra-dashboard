@@ -275,6 +275,10 @@
               <i data-lucide="history" style="width: 16px; height: 16px;"></i>
               Maneuver History Log
             </h2>
+            <h2 class="panel-title" id="tab-charts-btn" style="cursor: pointer; opacity: 0.5; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s;">
+              <i data-lucide="line-chart" style="width: 16px; height: 16px;"></i>
+              Subsystem Charts
+            </h2>
           </div>
           <div style="font-family: var(--font-mono); font-size: 0.65rem; color: #64748b;">
             Downlink Feed: <span style="color: hsl(var(--color-green));" id="lbl-ws-status">LOCAL OK</span>
@@ -289,6 +293,32 @@
           <!-- Maneuver History Log Container -->
           <div id="maneuver-history-container" style="display: none; flex: 1; overflow-y: auto; padding: 10px; font-family: var(--font-mono); font-size: 0.65rem; color: #e2e8f0; background: rgba(5, 7, 12, 0.4); border: 1px solid rgba(100, 116, 139, 0.2); border-radius: 4px; margin-bottom: 10px;">
             <div style="text-align: center; color: #64748b; margin-top: 20px;">No orbital maneuvers recorded.</div>
+          </div>
+
+          <!-- Subsystem Charts Container -->
+          <div id="subsystem-charts-container" style="display: none; flex: 1; flex-direction: column; overflow: hidden; padding: 10px; font-family: var(--font-mono); background: rgba(5, 7, 12, 0.4); border: 1px solid rgba(100, 116, 139, 0.2); border-radius: 4px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px;">
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="font-size: 0.65rem; color: #94a3b8;">ASSET:</span>
+                <select id="chart-sat-select" style="background: #0f172a; color: #e2e8f0; border: 1px solid rgba(100, 116, 139, 0.4); font-size: 0.65rem; padding: 2px 4px; border-radius: 3px; font-family: inherit; outline: none; cursor: pointer;">
+                  <option value="gaganyaan">Gaganyaan Crew Module</option>
+                  <option value="cartosat-3">Cartosat-3</option>
+                  <option value="navic-1i">NavIC-1I</option>
+                </select>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="font-size: 0.65rem; color: #94a3b8;">METRIC:</span>
+                <select id="chart-metric-select" style="background: #0f172a; color: #e2e8f0; border: 1px solid rgba(100, 116, 139, 0.4); font-size: 0.65rem; padding: 2px 4px; border-radius: 3px; font-family: inherit; outline: none; cursor: pointer;">
+                  <option value="batterySoC">Battery State of Charge (%)</option>
+                  <option value="batteryTemp">Battery Temperature (°C)</option>
+                  <option value="altitude">Altitude (km)</option>
+                  <option value="downlinkSNR">Signal SNR (dB)</option>
+                </select>
+              </div>
+            </div>
+            <div style="flex: 1; position: relative; min-height: 100px;">
+              <canvas id="subsystem-history-chart" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
+            </div>
           </div>
           
           <!-- Input command field -->
