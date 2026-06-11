@@ -204,6 +204,390 @@ const DEFAULT_SATELLITES = [
       fuelPressurePsi: 450.0,
       propellantMassKg: 800.0
     }
+  },
+  {
+    id: "iss",
+    name: "International Space Station",
+    owner: "NASA/ROSCOSMOS",
+    type: "Space Station",
+    lat: 51.64,
+    lng: 140.2,
+    alt: 418.5,
+    velocity: 7.66,
+    threatLevel: "NORMAL",
+    threatDetails: "Normal orbital tracking.",
+    tle1: "1 25544U 98067A   26155.50000000  .00010000  00000-0  10000-3 0  9992",
+    tle2: "2 25544  51.6400 140.2000 0005000  45.0000 315.0000 15.50000000    15",
+    category: "active",
+    orbit: {
+      lat: 51.64,
+      lng: 140.2,
+      alt: 418.5,
+      velocity: 7.66,
+      inEclipse: false,
+      burnAdjustments: { alt: 0 }
+    },
+    thermal: {
+      battTemp: 26.8,
+      expectedBattTemp: 26.8,
+      radiatorEfficiency: 0.95,
+      thermalStress: 0.0
+    },
+    power: {
+      solarV: 120.0,
+      solarGenerationW: 12000.0,
+      batterySoC: 94.2,
+      powerConsumptionW: 8000.0
+    },
+    communications: {
+      downlinkSNR: 28.5,
+      signalQuality: 0.99
+    },
+    radiation: {
+      cumulativeDoseRad: 6.25,
+      seuProbability: 0.00015,
+      seuCount: 0
+    },
+    propulsion: {
+      fuelPressurePsi: 240.0,
+      propellantMassKg: 1500.0
+    }
+  },
+  {
+    id: "hubble",
+    name: "Hubble Space Telescope",
+    owner: "NASA/ESA",
+    type: "Space Telescope",
+    lat: 28.47,
+    lng: 160.1,
+    alt: 525.2,
+    velocity: 7.59,
+    threatLevel: "NORMAL",
+    threatDetails: "Scientific observing windows active.",
+    tle1: "1 20580U 90037B   26155.50000000  .00001000  00000-0  50000-4 0  9993",
+    tle2: "2 20580  28.4700 160.1000 0003000  90.0000 270.0000 15.08000000    13",
+    category: "active",
+    orbit: {
+      lat: 28.47,
+      lng: 160.1,
+      alt: 525.2,
+      velocity: 7.59,
+      inEclipse: false,
+      burnAdjustments: { alt: 0 }
+    },
+    thermal: {
+      battTemp: 18.4,
+      expectedBattTemp: 18.4,
+      radiatorEfficiency: 0.95,
+      thermalStress: 0.0
+    },
+    power: {
+      solarV: 33.2,
+      solarGenerationW: 1200.0,
+      batterySoC: 85.0,
+      powerConsumptionW: 900.0
+    },
+    communications: {
+      downlinkSNR: 20.4,
+      signalQuality: 0.95
+    },
+    radiation: {
+      cumulativeDoseRad: 8.82,
+      seuProbability: 0.0002,
+      seuCount: 0
+    },
+    propulsion: {
+      fuelPressurePsi: 0.0,
+      propellantMassKg: 0.0
+    }
+  },
+  {
+    id: "starlink-1007",
+    name: "Starlink-1007",
+    owner: "SPACEX",
+    type: "Communication Satellite",
+    lat: 53.0,
+    lng: 180.5,
+    alt: 550.1,
+    velocity: 7.58,
+    threatLevel: "NORMAL",
+    threatDetails: "Broadband constellation operations.",
+    tle1: "1 44713U 19074A   26155.50000000  .00005000  00000-0  80000-4 0  9994",
+    tle2: "2 44713  53.0000 180.5000 0001000  30.0000 330.0000 15.06000000    11",
+    category: "starlink",
+    orbit: {
+      lat: 53.0,
+      lng: 180.5,
+      alt: 550.1,
+      velocity: 7.58,
+      inEclipse: false,
+      burnAdjustments: { alt: 0 }
+    },
+    thermal: {
+      battTemp: 22.1,
+      expectedBattTemp: 22.1,
+      radiatorEfficiency: 0.95,
+      thermalStress: 0.0
+    },
+    power: {
+      solarV: 28.5,
+      solarGenerationW: 400.0,
+      batterySoC: 78.4,
+      powerConsumptionW: 220.0
+    },
+    communications: {
+      downlinkSNR: 18.2,
+      signalQuality: 0.92
+    },
+    radiation: {
+      cumulativeDoseRad: 2.15,
+      seuProbability: 0.00005,
+      seuCount: 0
+    },
+    propulsion: {
+      fuelPressurePsi: 110.0,
+      propellantMassKg: 50.0
+    }
+  },
+  {
+    id: "soho",
+    name: "SOHO Solar Observatory",
+    owner: "ESA/NASA",
+    type: "Solar Probe",
+    lat: 23.44,
+    lng: 110.2,
+    alt: 35786.11,
+    velocity: 1.25,
+    threatLevel: "NORMAL",
+    threatDetails: "Deep space solar environment monitor.",
+    tle1: "1 23743U 95115A   26155.50000000  .00000010  00000-0  00000-0 0  9995",
+    tle2: "2 23743  23.4400 110.2000 0010000 180.0000 180.0000  1.00270000    12",
+    category: "active",
+    orbit: {
+      lat: 23.44,
+      lng: 110.2,
+      alt: 35786.11,
+      velocity: 1.25,
+      inEclipse: false,
+      burnAdjustments: { alt: 0 }
+    },
+    thermal: {
+      battTemp: 32.5,
+      expectedBattTemp: 32.5,
+      radiatorEfficiency: 0.95,
+      thermalStress: 0.0
+    },
+    power: {
+      solarV: 35.8,
+      solarGenerationW: 950.0,
+      batterySoC: 92.0,
+      powerConsumptionW: 650.0
+    },
+    communications: {
+      downlinkSNR: 15.4,
+      signalQuality: 0.85
+    },
+    radiation: {
+      cumulativeDoseRad: 48.5,
+      seuProbability: 0.0012,
+      seuCount: 0
+    },
+    propulsion: {
+      fuelPressurePsi: 320.0,
+      propellantMassKg: 120.0
+    }
+  },
+  {
+    id: "jwst",
+    name: "James Webb Space Telescope",
+    owner: "NASA/ESA/CSA",
+    type: "Space Telescope",
+    lat: 0.0,
+    lng: 0.0,
+    alt: 1500000.0,
+    velocity: 0.20,
+    threatLevel: "NORMAL",
+    threatDetails: "Deep space halo orbit tracking.",
+    tle1: "1 50463U 21130A   26155.50000000  .00000005  00000-0  00000-0 0  9996",
+    tle2: "2 50463  39.5800 135.2000 0001000  60.0000 300.0000  0.03660000    13",
+    category: "active",
+    orbit: {
+      lat: 0.0,
+      lng: 0.0,
+      alt: 1500000.0,
+      velocity: 0.20,
+      inEclipse: false,
+      burnAdjustments: { alt: 0 }
+    },
+    thermal: {
+      battTemp: 20.5,
+      expectedBattTemp: 20.5,
+      radiatorEfficiency: 0.95,
+      thermalStress: 0.0
+    },
+    power: {
+      solarV: 34.5,
+      solarGenerationW: 2000.0,
+      batterySoC: 96.4,
+      powerConsumptionW: 1200.0
+    },
+    communications: {
+      downlinkSNR: 14.8,
+      signalQuality: 0.82
+    },
+    radiation: {
+      cumulativeDoseRad: 85.4,
+      seuProbability: 0.002,
+      seuCount: 0
+    },
+    propulsion: {
+      fuelPressurePsi: 350.0,
+      propellantMassKg: 150.0
+    }
+  },
+  {
+    id: "parker",
+    name: "Parker Solar Probe",
+    owner: "NASA",
+    type: "Solar Probe",
+    lat: 0.0,
+    lng: 0.0,
+    alt: 140000.0,
+    velocity: 95.0,
+    threatLevel: "NORMAL",
+    threatDetails: "Heliocentric solar corona pass.",
+    tle1: "1 43613U 18065A   26155.50000000  .00000010  00000-0  00000-0 0  9997",
+    tle2: "2 43613  15.0000  45.0000 0005000  90.0000 270.0000  0.07300000    14",
+    category: "active",
+    orbit: {
+      lat: 0.0,
+      lng: 0.0,
+      alt: 140000.0,
+      velocity: 95.0,
+      inEclipse: false,
+      burnAdjustments: { alt: 0 }
+    },
+    thermal: {
+      battTemp: 42.5,
+      expectedBattTemp: 42.5,
+      radiatorEfficiency: 0.98,
+      thermalStress: 0.0
+    },
+    power: {
+      solarV: 36.8,
+      solarGenerationW: 3400.0,
+      batterySoC: 88.0,
+      powerConsumptionW: 850.0
+    },
+    communications: {
+      downlinkSNR: 16.5,
+      signalQuality: 0.88
+    },
+    radiation: {
+      cumulativeDoseRad: 240.5,
+      seuProbability: 0.005,
+      seuCount: 0
+    },
+    propulsion: {
+      fuelPressurePsi: 280.0,
+      propellantMassKg: 80.0
+    }
+  },
+  {
+    id: "tiangong",
+    name: "Tiangong Space Station",
+    owner: "CNSA",
+    type: "Space Station",
+    lat: 41.58,
+    lng: 150.3,
+    alt: 390.5,
+    velocity: 7.68,
+    threatLevel: "NORMAL",
+    threatDetails: "Manned station operations.",
+    tle1: "1 48274U 21035A   26155.50000000  .00015000  00000-0  15000-3 0  9991",
+    tle2: "2 48274  41.5840 150.3200 0008000  50.0000 310.0000 15.62000000    14",
+    category: "active",
+    orbit: {
+      lat: 41.58,
+      lng: 150.3,
+      alt: 390.5,
+      velocity: 7.68,
+      inEclipse: false,
+      burnAdjustments: { alt: 0 }
+    },
+    thermal: {
+      battTemp: 25.4,
+      expectedBattTemp: 25.4,
+      radiatorEfficiency: 0.95,
+      thermalStress: 0.0
+    },
+    power: {
+      solarV: 115.0,
+      solarGenerationW: 9000.0,
+      batterySoC: 93.8,
+      powerConsumptionW: 6200.0
+    },
+    communications: {
+      downlinkSNR: 26.8,
+      signalQuality: 0.98
+    },
+    radiation: {
+      cumulativeDoseRad: 5.82,
+      seuProbability: 0.00012,
+      seuCount: 0
+    },
+    propulsion: {
+      fuelPressurePsi: 230.0,
+      propellantMassKg: 1200.0
+    }
+  },
+  {
+    id: "voyager1",
+    name: "Voyager 1",
+    owner: "NASA",
+    type: "Interstellar Probe",
+    lat: 0.0,
+    lng: 0.0,
+    alt: 24000000000.0,
+    velocity: 17.0,
+    threatLevel: "NORMAL",
+    threatDetails: "Exploring the interstellar medium.",
+    tle1: "1 10312U 77076A   26155.50000000  .00000000  00000-0  00000-0 0  9999",
+    tle2: "2 10312  35.7000 280.5000 0000000   0.0000   0.0000  0.00000000     1",
+    category: "active",
+    orbit: {
+      lat: 0.0,
+      lng: 0.0,
+      alt: 24000000000.0,
+      velocity: 17.0,
+      inEclipse: true,
+      burnAdjustments: { alt: 0 }
+    },
+    thermal: {
+      battTemp: 5.4,
+      expectedBattTemp: 5.4,
+      radiatorEfficiency: 0.45,
+      thermalStress: 0.0
+    },
+    power: {
+      solarV: 0.0,
+      solarGenerationW: 0.0,
+      batterySoC: 100.0,
+      powerConsumptionW: 240.0
+    },
+    communications: {
+      downlinkSNR: 6.8,
+      signalQuality: 0.22
+    },
+    radiation: {
+      cumulativeDoseRad: 45000.0,
+      seuProbability: 0.055,
+      seuCount: 0
+    },
+    propulsion: {
+      fuelPressurePsi: 0.0,
+      propellantMassKg: 0.0
+    }
   }
 ];
 
@@ -211,7 +595,35 @@ function readLocalJson() {
   try {
     const raw = fs.readFileSync(LOCAL_DB_PATH, 'utf-8');
     const data = JSON.parse(raw || '{}');
-    if (!data.satellites) data.satellites = [...DEFAULT_SATELLITES];
+    if (!data.satellites) {
+      data.satellites = [...DEFAULT_SATELLITES];
+    } else {
+      // Upsert default satellites
+      DEFAULT_SATELLITES.forEach(defSat => {
+        const idx = data.satellites.findIndex(s => s.id === defSat.id);
+        if (idx === -1) {
+          data.satellites.push(defSat);
+        } else {
+          // Keep dynamic telemetry fields, but sync names/categories/TLE
+          data.satellites[idx].name = defSat.name;
+          data.satellites[idx].owner = defSat.owner;
+          data.satellites[idx].type = defSat.type;
+          data.satellites[idx].category = defSat.category;
+          data.satellites[idx].tle1 = defSat.tle1;
+          data.satellites[idx].tle2 = defSat.tle2;
+          if (!data.satellites[idx].orbit) data.satellites[idx].orbit = defSat.orbit;
+          if (!data.satellites[idx].thermal) data.satellites[idx].thermal = defSat.thermal;
+          if (!data.satellites[idx].power) data.satellites[idx].power = defSat.power;
+          if (!data.satellites[idx].communications) data.satellites[idx].communications = defSat.communications;
+          if (!data.satellites[idx].radiation) data.satellites[idx].radiation = defSat.radiation;
+          if (!data.satellites[idx].propulsion) data.satellites[idx].propulsion = defSat.propulsion;
+        }
+      });
+      // Save merged copy back
+      try {
+        fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
+      } catch (writeErr) {}
+    }
     if (!data.telemetryLogs) data.telemetryLogs = [];
     if (!data.agentActions) data.agentActions = [];
     return data;
@@ -349,25 +761,24 @@ export async function initializePostgresSchema() {
       // Standard PostgreSQL fallback (ignore hypertable error)
     }
 
-    const countRes = await client.query("SELECT COUNT(*) FROM satellites");
-    const count = parseInt(countRes.rows[0].count);
-    if (count === 0) {
-      console.log("Postgres: Satellites table empty. Seeding initial catalog...");
-      for (const sat of DEFAULT_SATELLITES) {
-        await client.query(
-          `INSERT INTO satellites 
-          (id, name, owner, type, lat, lng, alt, velocity, threat_level, threat_details, tle1, tle2, category, orbit, thermal, power, communications, radiation, propulsion, anomalies) 
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
-          [
-            sat.id, sat.name, sat.owner, sat.type, sat.lat, sat.lng, sat.alt, sat.velocity,
-            sat.threatLevel, sat.threatDetails, sat.tle1, sat.tle2, sat.category,
-            JSON.stringify(sat.orbit || null), JSON.stringify(sat.thermal || null),
-            JSON.stringify(sat.power || null), JSON.stringify(sat.communications || null),
-            JSON.stringify(sat.radiation || null), JSON.stringify(sat.propulsion || null),
-            JSON.stringify(sat.anomalies || null)
-          ]
-        );
-      }
+    console.log("Postgres: Seeding initial and missing catalog assets...");
+    for (const sat of DEFAULT_SATELLITES) {
+      await client.query(
+        `INSERT INTO satellites 
+        (id, name, owner, type, lat, lng, alt, velocity, threat_level, threat_details, tle1, tle2, category, orbit, thermal, power, communications, radiation, propulsion, anomalies) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+        ON CONFLICT (id) DO UPDATE SET 
+          name = EXCLUDED.name, owner = EXCLUDED.owner, type = EXCLUDED.type,
+          tle1 = EXCLUDED.tle1, tle2 = EXCLUDED.tle2, category = EXCLUDED.category`,
+        [
+          sat.id, sat.name, sat.owner, sat.type, sat.lat, sat.lng, sat.alt, sat.velocity,
+          sat.threatLevel, sat.threatDetails, sat.tle1, sat.tle2, sat.category,
+          JSON.stringify(sat.orbit || null), JSON.stringify(sat.thermal || null),
+          JSON.stringify(sat.power || null), JSON.stringify(sat.communications || null),
+          JSON.stringify(sat.radiation || null), JSON.stringify(sat.propulsion || null),
+          JSON.stringify(sat.anomalies || null)
+        ]
+      );
     }
   } catch (err) {
     console.error("Failed to initialize PostgreSQL schema:", err);

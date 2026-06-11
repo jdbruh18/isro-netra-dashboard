@@ -11,6 +11,7 @@ import { initAgentConsole } from './components/agent-console.js';
 import { initCollisionMonitor } from './components/collision-monitor.js';
 import { initGroundTrackMap, invalidateMapSize } from './components/ground-track.js';
 import { initSubsystemCharts } from './components/telemetry-charts.js';
+import { initRootCauseAnalyzer } from './components/root-cause-analyzer.js';
 
 let socket = null;
 let useWebsocket = false;
@@ -91,6 +92,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initAgentConsole(socket, useWebsocket);
   initGroundTrackMap();
   initSubsystemCharts();
+  initRootCauseAnalyzer();
 
   // 7.5. Bind Search and Filter Events
   bindSearchAndFilterEvents();

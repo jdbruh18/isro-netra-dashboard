@@ -17,7 +17,7 @@ export function propagateSatellite(tleLine1, tleLine2, date, altOffset = 0, kepl
       const positionEci = positionAndVelocity.position;
       const velocityEci = positionAndVelocity.velocity;
 
-      if (positionEci && velocityEci) {
+      if (positionEci && velocityEci && !isNaN(positionEci.x) && !isNaN(positionEci.y) && !isNaN(positionEci.z)) {
         // 3. Compute Greenwich Mean Sidereal Time
         const gmst = typeof lib.gstimest === 'function' ? lib.gstimest(date) : lib.gstime(date);
         

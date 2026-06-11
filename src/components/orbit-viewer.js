@@ -251,7 +251,8 @@ function renderSatelliteGeometries(sats) {
       // Plot standard orbit ellipse ring (120 segments)
       const segments = 120;
       const earthRadius = 6378.1;
-      const orbitRadius = earthRadius + s.alt;
+      const altVal = typeof s.alt === 'number' && !isNaN(s.alt) ? s.alt : (s.orbit && typeof s.orbit.alt === 'number' && !isNaN(s.orbit.alt) ? s.orbit.alt : 400);
+      const orbitRadius = earthRadius + altVal;
       const scale = 5 / earthRadius;
       const r = orbitRadius * scale;
 
@@ -352,7 +353,7 @@ function renderSatelliteGeometries(sats) {
 export function updateSatPositions3D(sats) {
   sats.forEach((s) => {
     const mesh = satObjectsMap.get(s.id);
-    if (mesh && s.position3d) {
+    if (mesh && s.position3d && !isNaN(s.position3d.x) && !isNaN(s.position3d.y) && !isNaN(s.position3d.z)) {
       mesh.position.set(s.position3d.x, s.position3d.y, s.position3d.z);
     }
   });

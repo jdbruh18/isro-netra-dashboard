@@ -24,6 +24,45 @@ An enterprise-grade, modular Space Domain Awareness (SDA) operations room and AI
 
 ---
 
+## System Architecture
+
+```mermaid
+graph TD
+    subgraph Client [Client-Side HUD UI]
+        Viewer[3D Orbit Viewer - Three.js]
+        GroundTrack[2D Ground Track Map - Leaflet]
+        Weather[Space Weather - Canvas]
+        Terminal[ISTRAC Ground Terminal]
+        Agent[Gemini Chat interface]
+        Propagator[SGP4 Propagator - satellite.js]
+    end
+
+    subgraph Backend [Google Cloud Run Backend]
+        Express[Express Web Server - server.js]
+        WS[WebSocket Telemetry Server]
+        Proxy[Gemini API Security Proxy]
+    end
+
+    subgraph External [Google Cloud & AI Services]
+        Gemini[Gemini 1.5 Flash Model]
+        Secrets[GCP Secret Manager]
+        Registry[GCP Artifact Registry]
+        Firestore[(GCP Firestore Database)]
+    end
+
+    Viewer -->|Updates coordinates| Propagator
+    GroundTrack -->|Reads coordinates| Propagator
+    Terminal -->|Uplinks command| Express
+    Agent -->|Sends Prompt| Proxy
+    Proxy -->|Queries with Tools| Gemini
+    Express -->|Pushes coordinates| WS
+    WS -->|Streams Telemetry| Client
+    Secrets -->|Mounts API Key| Express
+    Express -->|Reads/Writes States| Firestore
+```
+
+---
+
 ## Directory Layout
 
 ```
@@ -62,7 +101,7 @@ We are developing this system in four distinct validation phases to maintain arc
 
 ### Phase 1: Standalone Client UI (Immediate & Zero-Setup)
 Verify the visual HUD animations, 3D Canvas rendering, and SGP4 mechanics locally in your browser.
-1. Double-click [index.html](file:///C:/Users/MSI/.gemini/antigravity/scratch/space-intelligence-dashboard/index.html) to open it.
+1. Double-click [index.html](file:///D:/space-intelligence-dashboard/index.html) to open it.
 2. Verify you can drag/rotate the globe, check active orbits, and view solar wind charts.
 3. Test Ground Control commands: type `/diagnose` or `/burn gaganyaan 1.45` in the terminal input.
 4. Paste a Gemini API Key in the chat panel configuration input and test live prompts (e.g. *"Check for debris risks"*).

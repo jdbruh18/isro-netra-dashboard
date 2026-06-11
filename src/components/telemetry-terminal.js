@@ -1,6 +1,7 @@
 import store from '../core/state.js';
 import audio from '../core/audio.js';
 import { validateBurn } from '../core/avoidance-proof.js';
+import { SemanticKnowledgeGraph } from '../core/knowledge-graph.js';
 
 let logContainer, inputField, submitBtn;
 
@@ -15,10 +16,12 @@ export function initTelemetryTerminal() {
   const tabTerminalBtn = document.getElementById('tab-terminal-btn');
   const tabHistoryBtn = document.getElementById('tab-history-btn');
   const tabChartsBtn = document.getElementById('tab-charts-btn');
+  const tabRcaBtn = document.getElementById('tab-rca-btn');
   
   const terminalScreen = document.getElementById('terminal-screen-container');
   const historyContainer = document.getElementById('maneuver-history-container');
   const chartsContainer = document.getElementById('subsystem-charts-container');
+  const rcaContainer = document.getElementById('subsystem-rca-container');
   const inputRow = document.getElementById('terminal-input-row-container');
 
   let activeTab = 'terminal';
@@ -28,31 +31,50 @@ export function initTelemetryTerminal() {
       if (tabTerminalBtn) tabTerminalBtn.style.opacity = '1';
       if (tabHistoryBtn) tabHistoryBtn.style.opacity = '0.5';
       if (tabChartsBtn) tabChartsBtn.style.opacity = '0.5';
+      if (tabRcaBtn) tabRcaBtn.style.opacity = '0.5';
       if (terminalScreen) terminalScreen.style.display = 'block';
       if (historyContainer) historyContainer.style.display = 'none';
       if (chartsContainer) chartsContainer.style.display = 'none';
+      if (rcaContainer) rcaContainer.style.display = 'none';
       if (inputRow) inputRow.style.display = 'flex';
       if (terminalScreen) terminalScreen.scrollTop = terminalScreen.scrollHeight;
     } else if (activeTab === 'history') {
       if (tabTerminalBtn) tabTerminalBtn.style.opacity = '0.5';
       if (tabHistoryBtn) tabHistoryBtn.style.opacity = '1';
       if (tabChartsBtn) tabChartsBtn.style.opacity = '0.5';
+      if (tabRcaBtn) tabRcaBtn.style.opacity = '0.5';
       if (terminalScreen) terminalScreen.style.display = 'none';
       if (historyContainer) historyContainer.style.display = 'block';
       if (chartsContainer) chartsContainer.style.display = 'none';
+      if (rcaContainer) rcaContainer.style.display = 'none';
       if (inputRow) inputRow.style.display = 'none';
       renderManeuverHistory();
     } else if (activeTab === 'charts') {
       if (tabTerminalBtn) tabTerminalBtn.style.opacity = '0.5';
       if (tabHistoryBtn) tabHistoryBtn.style.opacity = '0.5';
       if (tabChartsBtn) tabChartsBtn.style.opacity = '1';
+      if (tabRcaBtn) tabRcaBtn.style.opacity = '0.5';
       if (terminalScreen) terminalScreen.style.display = 'none';
       if (historyContainer) historyContainer.style.display = 'none';
       if (chartsContainer) chartsContainer.style.display = 'flex';
+      if (rcaContainer) rcaContainer.style.display = 'none';
       if (inputRow) inputRow.style.display = 'none';
       
       // Dispatch custom event to let the charting module know the tab is active
       document.dispatchEvent(new CustomEvent('subsystem-charts-activated'));
+    } else if (activeTab === 'rca') {
+      if (tabTerminalBtn) tabTerminalBtn.style.opacity = '0.5';
+      if (tabHistoryBtn) tabHistoryBtn.style.opacity = '0.5';
+      if (tabChartsBtn) tabChartsBtn.style.opacity = '0.5';
+      if (tabRcaBtn) tabRcaBtn.style.opacity = '1';
+      if (terminalScreen) terminalScreen.style.display = 'none';
+      if (historyContainer) historyContainer.style.display = 'none';
+      if (chartsContainer) chartsContainer.style.display = 'none';
+      if (rcaContainer) rcaContainer.style.display = 'flex';
+      if (inputRow) inputRow.style.display = 'none';
+      
+      // Dispatch custom event to let the RCA analyzer know the tab is active
+      document.dispatchEvent(new CustomEvent('subsystem-rca-activated'));
     }
   };
 
@@ -76,6 +98,14 @@ export function initTelemetryTerminal() {
     tabChartsBtn.addEventListener('click', () => {
       audio.playClick();
       activeTab = 'charts';
+      updateTabViews();
+    });
+  }
+
+  if (tabRcaBtn) {
+    tabRcaBtn.addEventListener('click', () => {
+      audio.playClick();
+      activeTab = 'rca';
       updateTabViews();
     });
   }
@@ -150,9 +180,42 @@ function parseUplinkCommand(command) {
       store.addLog('Available Uplink Commands:', 'info');
       store.addLog('  /diagnose                      - Execute satellite sensor checks.', 'info');
       store.addLog('  /burn <satelliteId> <deltaV>   - Execute thruster burn to shift orbit (e.g. /burn gaganyaan 1.45).', 'info');
+      store.addLog('  /rca <satelliteId>             - Diagnose root causes of active anomalies (e.g. /rca gaganyaan).', 'info');
       store.addLog('  /weather                       - Pull data from Aditya-L1 solar probes.', 'info');
       store.addLog('  /storm                         - Toggle simulated solar storm state.', 'info');
       store.addLog('  /clear                         - Clear console log lines.', 'info');
+      break;
+
+    case '/rca':
+      {
+        const satId = parts[1] ? parts[1].toLowerCase() : 'gaganyaan';
+        const targetSat = store.getState().satellites.find(s => s.id === satId);
+        if (!targetSat) {
+          store.addLog(`ERROR: Spacecraft ID "${satId}" not recognized in catalog.`, 'danger');
+          return;
+        }
+        store.addLog(`Initiating Root Cause Analysis (RCA) on spacecraft: ${targetSat.name}...`, 'info');
+        
+        setTimeout(() => {
+          const graph = new SemanticKnowledgeGraph();
+          const weather = store.getState().spaceWeather || {};
+          const rcaResult = graph.analyzeRootCause(targetSat, weather);
+          
+          if (rcaResult.activeAnomalies.length === 0) {
+            store.addLog(`✓ RCA Complete: ${targetSat.name} has no active anomalies. Subsystems nominal.`, 'success');
+            audio.playSuccess();
+            return;
+          }
+          
+          store.addLog(`RCA COMPLETE: ${rcaResult.activeAnomalies.length} active anomalies diagnosed.`, 'warning');
+          rcaResult.chains.forEach(c => {
+            store.addLog(`  Anomaly Chain for [${c.anomaly}]:`, 'warning');
+            const chainStr = c.chain.map(node => `${node.nodeId} (${node.type})`).join(' ➔ ');
+            store.addLog(`    Path: ${chainStr}`, 'info');
+          });
+          audio.playSuccess();
+        }, 800);
+      }
       break;
 
     case '/clear':
@@ -239,7 +302,16 @@ function parseUplinkCommand(command) {
       // Enforce Idris 2 type-level bounds validation locally
       const debris = sats.find(s => s.category === 'debris') || { alt: 405.41 };
       const safetyMargin = 2.0; // 2 km safety clearance
-      const validation = validateBurn(satId, deltaV, "PROGRADE", target.alt, debris.alt, safetyMargin);
+      const validation = validateBurn(
+        satId,
+        deltaV,
+        "PROGRADE",
+        target.alt,
+        debris.alt,
+        safetyMargin,
+        target.thermal ? target.thermal.thermalStress : 0.0,
+        target.radiation ? target.radiation.seuProbability : 0.0
+      );
       if (!validation.success) {
         store.addLog(`ERROR: Maneuver blocked by Idris 2 verification: ${validation.error}`, 'danger');
         audio.playHover();

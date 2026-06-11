@@ -78,6 +78,28 @@ export function initSubsystemCharts() {
 
   // Subscribe to live state updates to populate local memory backup
   store.subscribe('satellites', (satellites) => {
+    // Dynamically rebuild satellite selector options
+    const activeSats = satellites.filter(s => s.category !== 'debris' && s.type !== 'Space Debris' && s.id !== 'cosmos-debris');
+    const currentOptions = Array.from(satSelect.options).map(o => o.value);
+    const activeSatIds = activeSats.map(s => s.id);
+    
+    if (JSON.stringify(currentOptions) !== JSON.stringify(activeSatIds)) {
+      const prevVal = satSelect.value;
+      satSelect.innerHTML = '';
+      activeSats.forEach(sat => {
+        const opt = document.createElement('option');
+        opt.value = sat.id;
+        opt.textContent = sat.name;
+        satSelect.appendChild(opt);
+      });
+      if (activeSatIds.includes(prevVal)) {
+        satSelect.value = prevVal;
+      } else if (activeSatIds.length > 0) {
+        satSelect.value = activeSatIds[0];
+        activeSatelliteId = satSelect.value;
+      }
+    }
+
     satellites.forEach(sat => {
       const isDebris = sat.id === 'cosmos-debris' || sat.category === 'debris';
       if (isDebris) return;

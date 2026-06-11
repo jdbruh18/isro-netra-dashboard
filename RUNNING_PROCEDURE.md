@@ -19,7 +19,7 @@ To spin up the Node.js Express telemetry and WebSocket proxy server:
 
 1. Open a terminal (PowerShell or Bash) and navigate to the project directory:
    ```bash
-   cd C:\Users\MSI\.gemini\antigravity\scratch\space-intelligence-dashboard
+   cd D:\space-intelligence-dashboard
    ```
 2. Build and start the containers using Docker Compose:
    ```bash

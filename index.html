@@ -279,6 +279,10 @@
               <i data-lucide="line-chart" style="width: 16px; height: 16px;"></i>
               Subsystem Charts
             </h2>
+            <h2 class="panel-title" id="tab-rca-btn" style="cursor: pointer; opacity: 0.5; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s;">
+              <i data-lucide="git-branch" style="width: 16px; height: 16px;"></i>
+              RCA Twin Analyzer
+            </h2>
           </div>
           <div style="font-family: var(--font-mono); font-size: 0.65rem; color: #64748b;">
             Downlink Feed: <span style="color: hsl(var(--color-green));" id="lbl-ws-status">LOCAL OK</span>
@@ -318,6 +322,24 @@
             </div>
             <div style="flex: 1; position: relative; min-height: 100px;">
               <canvas id="subsystem-history-chart" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
+            </div>
+          </div>
+
+          <!-- Subsystem RCA Container -->
+          <div id="subsystem-rca-container" style="display: none; flex: 1; flex-direction: column; overflow-y: auto; padding: 12px; font-family: var(--font-mono); background: rgba(5, 7, 12, 0.4); border: 1px solid rgba(100, 116, 139, 0.2); border-radius: 4px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="font-size: 0.65rem; color: #94a3b8;">DIAGNOSTIC TARGET:</span>
+                <select id="rca-sat-select" style="background: #0f172a; color: #e2e8f0; border: 1px solid rgba(100, 116, 139, 0.4); font-size: 0.65rem; padding: 2px 4px; border-radius: 3px; font-family: inherit; outline: none; cursor: pointer;">
+                  <option value="gaganyaan">Gaganyaan Crew Module</option>
+                  <option value="cartosat-3">Cartosat-3</option>
+                  <option value="navic-1i">NavIC-1I</option>
+                </select>
+              </div>
+              <button id="btn-trigger-rca" class="hud-btn" style="padding: 2px 8px; font-size: 0.6rem;">RUN ROOT CAUSE ANALYSIS</button>
+            </div>
+            <div id="rca-results-tree" style="flex: 1; font-size: 0.7rem; line-height: 1.4; color: #e2e8f0;">
+              <div style="text-align: center; color: #64748b; margin-top: 20px;">Select a spacecraft and trigger analysis to diagnose active failure chains.</div>
             </div>
           </div>
           

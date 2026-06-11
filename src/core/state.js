@@ -236,30 +236,68 @@ class StateStore {
       }
 
       if (s.orbit && s.power && s.thermal && s.communications && s.radiation && s.propulsion) {
-        // Run simple physics simulation updates locally
+        const RE = 6378.137;
         const rad = Math.PI / 180;
         const sunLng = ((Date.now() / 240000) * 360) % 360;
         const cosPhi = Math.cos(s.orbit.lat * rad) * Math.cos((s.orbit.lng - sunLng) * rad);
         const sinPhi = Math.sqrt(1 - cosPhi * cosPhi);
         const isBehindEarth = cosPhi < 0;
-        const isShadowBlocked = (6378.137 + s.orbit.alt) * sinPhi < 6378.137;
-        s.orbit.inEclipse = isBehindEarth && isShadowBlocked;
+        
+        // Penumbral shadow factor calculation
+        const shadowFactor = isBehindEarth && (RE + s.orbit.alt) * sinPhi < RE + 100 
+          ? Math.min(1.0, Math.max(0.0, (RE + 100 - (RE + s.orbit.alt) * sinPhi) / 100)) 
+          : 0.0;
+        
+        s.orbit.inEclipse = shadowFactor > 0.0;
 
+        let deltaSoC = 0.0;
+        let dT = 0.0;
+
+        // Solar Panel Power Model with cell degradation
         const cosTheta = s.orbit.inEclipse ? 0.0 : Math.max(0.1, cosPhi);
-        s.power.solarGenerationW = s.orbit.inEclipse ? 0.0 : parseFloat((280.0 * cosTheta).toFixed(1));
-        s.power.solarV = s.orbit.inEclipse ? 0.0 : parseFloat((30.0 + 4.1 * cosTheta + (Math.random() - 0.5) * 0.3).toFixed(2));
-        const netPower = s.power.solarGenerationW - s.power.powerConsumptionW;
-        s.power.batterySoC = parseFloat(Math.max(0, Math.min(100, s.power.batterySoC + netPower / 1000.0)).toFixed(2));
+        const maxPower = s.id === 'navic-1i' ? 450.0 : 280.0;
+        const cumulativeDose = s.radiation ? s.radiation.cumulativeDoseRad : 4.12;
+        const generation = maxPower * cosTheta * (1.0 - shadowFactor) * Math.max(0.70, 1.0 - cumulativeDose * 0.005);
+        
+        s.power.solarGenerationW = parseFloat(Math.max(0.0, generation).toFixed(1));
+        s.power.solarV = shadowFactor === 1.0 ? 0.0 : parseFloat((30.0 + 4.1 * cosTheta * (1.0 - shadowFactor) + (Math.random() - 0.5) * 0.3).toFixed(2));
 
+        // Louvers modulation
+        s.thermal.radiatorEfficiency = s.thermal.battTemp > 40.0 ? 0.98 : (s.thermal.battTemp < 15.0 ? 0.45 : 0.85);
+
+        // Active thermostat power consumption
+        const basePower = s.id === 'navic-1i' ? 180.0 : 120.0;
+        if (s.thermal.battTemp < 5.0) {
+          s.power.powerConsumptionW = basePower + 40.0;
+          s.thermal.heaterStatus = "ACTIVE";
+        } else {
+          s.power.powerConsumptionW = basePower;
+          s.thermal.heaterStatus = "OFF";
+        }
+
+        const netPower = s.power.solarGenerationW - s.power.powerConsumptionW;
+        const capacityWh = s.id === 'navic-1i' ? 5000.0 : 2000.0;
+        // SoC speed-up factor 300
+        deltaSoC = (netPower / (capacityWh * 3600)) * 100 * 300;
+        s.power.batterySoC = parseFloat(Math.max(0, Math.min(100, s.power.batterySoC + deltaSoC)).toFixed(2));
+
+        // Subsystem Thermal Model with active heater
         const T_space = 3.0;
         const sigma = 5.67e-8;
         const T_kelvin = s.thermal.battTemp + 273.15;
         const Q_in = (s.power.powerConsumptionW * 0.15) + (s.orbit.inEclipse ? 0.0 : 180.0);
         const Q_out = sigma * s.thermal.radiatorEfficiency * 1.5 * (Math.pow(T_kelvin, 4) - Math.pow(T_space, 4));
-        const dT = ((Q_in - Q_out) / 25000.0) * 60;
+        dT = ((Q_in - Q_out) / 25000.0) * 60;
+        if (s.thermal.heaterStatus === "ACTIVE") {
+          dT += 0.25;
+        }
         s.thermal.battTemp = parseFloat(Math.max(-50, Math.min(100, s.thermal.battTemp + dT)).toFixed(2));
-        s.thermal.expectedBattTemp = s.thermal.battTemp;
-        s.thermal.thermalStress = 0.0;
+
+        const T_expected_kelvin = s.thermal.expectedBattTemp + 273.15;
+        const Q_out_expected = sigma * 0.95 * 1.5 * (Math.pow(T_expected_kelvin, 4) - Math.pow(T_space, 4));
+        const dT_expected = ((Q_in - Q_out_expected) / 25000.0) * 60;
+        s.thermal.expectedBattTemp = parseFloat(Math.max(-50, Math.min(100, s.thermal.expectedBattTemp + dT_expected)).toFixed(2));
+        s.thermal.thermalStress = parseFloat(Math.abs(s.thermal.battTemp - s.thermal.expectedBattTemp).toFixed(2));
 
         const gamma = 1e-5;
         s.radiation.cumulativeDoseRad = parseFloat((s.radiation.cumulativeDoseRad + gamma * weather.solarProtonFlux).toFixed(4));
@@ -275,7 +313,7 @@ class StateStore {
         s.communications.signalQuality = parseFloat((s.communications.downlinkSNR / 30.0).toFixed(2));
         s.propulsion.fuelPressurePsi = parseFloat(Math.max(10.0, s.propulsion.fuelPressurePsi + (Math.random() - 0.5) * 0.3).toFixed(1));
 
-        // Calculate drag decay rate locally for prediction countdowns
+        // Drag decay alt calculation
         let deltaAlt = 0;
         if (s.orbit.alt < 600) {
           const H_base = 50.0;
@@ -284,9 +322,9 @@ class StateStore {
           const rho = 6e-12 * Math.exp(-(s.orbit.alt - 350.0) / H);
           const kappa = 2.5e7;
           deltaAlt = - kappa * rho * Math.pow(s.orbit.velocity, 2) * 1.0;
+          s.orbit.alt = Math.max(100, s.orbit.alt + deltaAlt);
         }
 
-        // 9.1 Local Anomaly Detection and Predictions (V3.4)
         const isStorm = weather.solarProtonFlux > 15.0 || weather.kpIndex >= 4.5;
         const activeAnomalies = [];
         
@@ -307,7 +345,6 @@ class StateStore {
         }
 
         let depletionTime = -1;
-        const deltaSoC = netPower / 1000.0;
         if (deltaSoC < 0) {
           depletionTime = parseFloat((s.power.batterySoC / -deltaSoC).toFixed(1));
         }

@@ -7,6 +7,9 @@ import { fileURLToPath } from 'url';
 import { initializeDb, getSatellites, saveSatellite, saveLog, saveAgentAction, saveTelemetryHistory, getTelemetryHistory } from './db.js';
 import { validateBurn } from './src/core/avoidance-proof.js';
 import { validatePowerState, validateThrusterFuel, validateADCSState } from './src/core/subsystem-safety-proof.js';
+import { SemanticKnowledgeGraph } from './src/core/knowledge-graph.js';
+
+const graph = new SemanticKnowledgeGraph();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -287,6 +290,390 @@ let serverTelemetry = {
         fuelPressurePsi: 450.0,
         propellantMassKg: 800.0
       }
+    },
+    {
+      id: "iss",
+      name: "International Space Station",
+      owner: "NASA/ROSCOSMOS",
+      type: "Space Station",
+      lat: 51.64,
+      lng: 140.2,
+      alt: 418.5,
+      velocity: 7.66,
+      threatLevel: "NORMAL",
+      threatDetails: "Normal orbital tracking.",
+      tle1: "1 25544U 98067A   26155.50000000  .00010000  00000-0  10000-3 0  9992",
+      tle2: "2 25544  51.6400 140.2000 0005000  45.0000 315.0000 15.50000000    15",
+      category: "active",
+      orbit: {
+        lat: 51.64,
+        lng: 140.2,
+        alt: 418.5,
+        velocity: 7.66,
+        inEclipse: false,
+        burnAdjustments: { alt: 0 }
+      },
+      thermal: {
+        battTemp: 26.8,
+        expectedBattTemp: 26.8,
+        radiatorEfficiency: 0.95,
+        thermalStress: 0.0
+      },
+      power: {
+        solarV: 120.0,
+        solarGenerationW: 12000.0,
+        batterySoC: 94.2,
+        powerConsumptionW: 8000.0
+      },
+      communications: {
+        downlinkSNR: 28.5,
+        signalQuality: 0.99
+      },
+      radiation: {
+        cumulativeDoseRad: 6.25,
+        seuProbability: 0.00015,
+        seuCount: 0
+      },
+      propulsion: {
+        fuelPressurePsi: 240.0,
+        propellantMassKg: 1500.0
+      }
+    },
+    {
+      id: "hubble",
+      name: "Hubble Space Telescope",
+      owner: "NASA/ESA",
+      type: "Space Telescope",
+      lat: 28.47,
+      lng: 160.1,
+      alt: 525.2,
+      velocity: 7.59,
+      threatLevel: "NORMAL",
+      threatDetails: "Scientific observing windows active.",
+      tle1: "1 20580U 90037B   26155.50000000  .00001000  00000-0  50000-4 0  9993",
+      tle2: "2 20580  28.4700 160.1000 0003000  90.0000 270.0000 15.08000000    13",
+      category: "active",
+      orbit: {
+        lat: 28.47,
+        lng: 160.1,
+        alt: 525.2,
+        velocity: 7.59,
+        inEclipse: false,
+        burnAdjustments: { alt: 0 }
+      },
+      thermal: {
+        battTemp: 18.4,
+        expectedBattTemp: 18.4,
+        radiatorEfficiency: 0.95,
+        thermalStress: 0.0
+      },
+      power: {
+        solarV: 33.2,
+        solarGenerationW: 1200.0,
+        batterySoC: 85.0,
+        powerConsumptionW: 900.0
+      },
+      communications: {
+        downlinkSNR: 20.4,
+        signalQuality: 0.95
+      },
+      radiation: {
+        cumulativeDoseRad: 8.82,
+        seuProbability: 0.0002,
+        seuCount: 0
+      },
+      propulsion: {
+        fuelPressurePsi: 0.0,
+        propellantMassKg: 0.0
+      }
+    },
+    {
+      id: "starlink-1007",
+      name: "Starlink-1007",
+      owner: "SPACEX",
+      type: "Communication Satellite",
+      lat: 53.0,
+      lng: 180.5,
+      alt: 550.1,
+      velocity: 7.58,
+      threatLevel: "NORMAL",
+      threatDetails: "Broadband constellation operations.",
+      tle1: "1 44713U 19074A   26155.50000000  .00005000  00000-0  80000-4 0  9994",
+      tle2: "2 44713  53.0000 180.5000 0001000  30.0000 330.0000 15.06000000    11",
+      category: "starlink",
+      orbit: {
+        lat: 53.0,
+        lng: 180.5,
+        alt: 550.1,
+        velocity: 7.58,
+        inEclipse: false,
+        burnAdjustments: { alt: 0 }
+      },
+      thermal: {
+        battTemp: 22.1,
+        expectedBattTemp: 22.1,
+        radiatorEfficiency: 0.95,
+        thermalStress: 0.0
+      },
+      power: {
+        solarV: 28.5,
+        solarGenerationW: 400.0,
+        batterySoC: 78.4,
+        powerConsumptionW: 220.0
+      },
+      communications: {
+        downlinkSNR: 18.2,
+        signalQuality: 0.92
+      },
+      radiation: {
+        cumulativeDoseRad: 2.15,
+        seuProbability: 0.00005,
+        seuCount: 0
+      },
+      propulsion: {
+        fuelPressurePsi: 110.0,
+        propellantMassKg: 50.0
+      }
+    },
+    {
+      id: "soho",
+      name: "SOHO Solar Observatory",
+      owner: "ESA/NASA",
+      type: "Solar Probe",
+      lat: 23.44,
+      lng: 110.2,
+      alt: 35786.11,
+      velocity: 1.25,
+      threatLevel: "NORMAL",
+      threatDetails: "Deep space solar environment monitor.",
+      tle1: "1 23743U 95115A   26155.50000000  .00000010  00000-0  00000-0 0  9995",
+      tle2: "2 23743  23.4400 110.2000 0010000 180.0000 180.0000  1.00270000    12",
+      category: "active",
+      orbit: {
+        lat: 23.44,
+        lng: 110.2,
+        alt: 35786.11,
+        velocity: 1.25,
+        inEclipse: false,
+        burnAdjustments: { alt: 0 }
+      },
+      thermal: {
+        battTemp: 32.5,
+        expectedBattTemp: 32.5,
+        radiatorEfficiency: 0.95,
+        thermalStress: 0.0
+      },
+      power: {
+        solarV: 35.8,
+        solarGenerationW: 950.0,
+        batterySoC: 92.0,
+        powerConsumptionW: 650.0
+      },
+      communications: {
+        downlinkSNR: 15.4,
+        signalQuality: 0.85
+      },
+      radiation: {
+        cumulativeDoseRad: 48.5,
+        seuProbability: 0.0012,
+        seuCount: 0
+      },
+      propulsion: {
+        fuelPressurePsi: 320.0,
+        propellantMassKg: 120.0
+      }
+    },
+    {
+      id: "jwst",
+      name: "James Webb Space Telescope",
+      owner: "NASA/ESA/CSA",
+      type: "Space Telescope",
+      lat: 0.0,
+      lng: 0.0,
+      alt: 1500000.0,
+      velocity: 0.20,
+      threatLevel: "NORMAL",
+      threatDetails: "Deep space halo orbit tracking.",
+      tle1: "1 50463U 21130A   26155.50000000  .00000005  00000-0  00000-0 0  9996",
+      tle2: "2 50463  39.5800 135.2000 0001000  60.0000 300.0000  0.03660000    13",
+      category: "active",
+      orbit: {
+        lat: 0.0,
+        lng: 0.0,
+        alt: 1500000.0,
+        velocity: 0.20,
+        inEclipse: false,
+        burnAdjustments: { alt: 0 }
+      },
+      thermal: {
+        battTemp: 20.5,
+        expectedBattTemp: 20.5,
+        radiatorEfficiency: 0.95,
+        thermalStress: 0.0
+      },
+      power: {
+        solarV: 34.5,
+        solarGenerationW: 2000.0,
+        batterySoC: 96.4,
+        powerConsumptionW: 1200.0
+      },
+      communications: {
+        downlinkSNR: 14.8,
+        signalQuality: 0.82
+      },
+      radiation: {
+        cumulativeDoseRad: 85.4,
+        seuProbability: 0.002,
+        seuCount: 0
+      },
+      propulsion: {
+        fuelPressurePsi: 350.0,
+        propellantMassKg: 150.0
+      }
+    },
+    {
+      id: "parker",
+      name: "Parker Solar Probe",
+      owner: "NASA",
+      type: "Solar Probe",
+      lat: 0.0,
+      lng: 0.0,
+      alt: 140000.0,
+      velocity: 95.0,
+      threatLevel: "NORMAL",
+      threatDetails: "Heliocentric solar corona pass.",
+      tle1: "1 43613U 18065A   26155.50000000  .00000010  00000-0  00000-0 0  9997",
+      tle2: "2 43613  15.0000  45.0000 0005000  90.0000 270.0000  0.07300000    14",
+      category: "active",
+      orbit: {
+        lat: 0.0,
+        lng: 0.0,
+        alt: 140000.0,
+        velocity: 95.0,
+        inEclipse: false,
+        burnAdjustments: { alt: 0 }
+      },
+      thermal: {
+        battTemp: 42.5,
+        expectedBattTemp: 42.5,
+        radiatorEfficiency: 0.98,
+        thermalStress: 0.0
+      },
+      power: {
+        solarV: 36.8,
+        solarGenerationW: 3400.0,
+        batterySoC: 88.0,
+        powerConsumptionW: 850.0
+      },
+      communications: {
+        downlinkSNR: 16.5,
+        signalQuality: 0.88
+      },
+      radiation: {
+        cumulativeDoseRad: 240.5,
+        seuProbability: 0.005,
+        seuCount: 0
+      },
+      propulsion: {
+        fuelPressurePsi: 280.0,
+        propellantMassKg: 80.0
+      }
+    },
+    {
+      id: "tiangong",
+      name: "Tiangong Space Station",
+      owner: "CNSA",
+      type: "Space Station",
+      lat: 41.58,
+      lng: 150.3,
+      alt: 390.5,
+      velocity: 7.68,
+      threatLevel: "NORMAL",
+      threatDetails: "Manned station operations.",
+      tle1: "1 48274U 21035A   26155.50000000  .00015000  00000-0  15000-3 0  9991",
+      tle2: "2 48274  41.5840 150.3200 0008000  50.0000 310.0000 15.62000000    14",
+      category: "active",
+      orbit: {
+        lat: 41.58,
+        lng: 150.3,
+        alt: 390.5,
+        velocity: 7.68,
+        inEclipse: false,
+        burnAdjustments: { alt: 0 }
+      },
+      thermal: {
+        battTemp: 25.4,
+        expectedBattTemp: 25.4,
+        radiatorEfficiency: 0.95,
+        thermalStress: 0.0
+      },
+      power: {
+        solarV: 115.0,
+        solarGenerationW: 9000.0,
+        batterySoC: 93.8,
+        powerConsumptionW: 6200.0
+      },
+      communications: {
+        downlinkSNR: 26.8,
+        signalQuality: 0.98
+      },
+      radiation: {
+        cumulativeDoseRad: 5.82,
+        seuProbability: 0.00012,
+        seuCount: 0
+      },
+      propulsion: {
+        fuelPressurePsi: 230.0,
+        propellantMassKg: 1200.0
+      }
+    },
+    {
+      id: "voyager1",
+      name: "Voyager 1",
+      owner: "NASA",
+      type: "Interstellar Probe",
+      lat: 0.0,
+      lng: 0.0,
+      alt: 24000000000.0,
+      velocity: 17.0,
+      threatLevel: "NORMAL",
+      threatDetails: "Exploring the interstellar medium.",
+      tle1: "1 10312U 77076A   26155.50000000  .00000000  00000-0  00000-0 0  9999",
+      tle2: "2 10312  35.7000 280.5000 0000000   0.0000   0.0000  0.00000000     1",
+      category: "active",
+      orbit: {
+        lat: 0.0,
+        lng: 0.0,
+        alt: 24000000000.0,
+        velocity: 17.0,
+        inEclipse: true,
+        burnAdjustments: { alt: 0 }
+      },
+      thermal: {
+        battTemp: 5.4,
+        expectedBattTemp: 5.4,
+        radiatorEfficiency: 0.45,
+        thermalStress: 0.0
+      },
+      power: {
+        solarV: 0.0,
+        solarGenerationW: 0.0,
+        batterySoC: 100.0,
+        powerConsumptionW: 240.0
+      },
+      communications: {
+        downlinkSNR: 6.8,
+        signalQuality: 0.22
+      },
+      radiation: {
+        cumulativeDoseRad: 45000.0,
+        seuProbability: 0.055,
+        seuCount: 0
+      },
+      propulsion: {
+        fuelPressurePsi: 0.0,
+        propellantMassKg: 0.0
+      }
     }
   ],
   spaceWeather: {
@@ -390,7 +777,16 @@ async function executeManeuver(satId, deltaV, direction, source = "Manual Contro
   // Enforce Idris 2 type-level bounds validation
   const debris = serverTelemetry.satellites.find(s => s.category === 'debris') || { alt: 405.41 };
   const safetyMargin = 2.0; // 2 km safety clearance
-  const validation = validateBurn(satId, parsedDeltaV, direction, sat.alt, debris.alt, safetyMargin);
+  const validation = validateBurn(
+    satId,
+    parsedDeltaV,
+    direction,
+    sat.alt,
+    debris.alt,
+    safetyMargin,
+    sat.thermal ? sat.thermal.thermalStress : 0.0,
+    sat.radiation ? sat.radiation.seuProbability : 0.0
+  );
   if (!validation.success) {
     return { status: "ERROR", message: "Maneuver blocked by Idris 2 verification: " + validation.error };
   }
@@ -489,6 +885,18 @@ app.get('/api/telemetry/history', async (req, res) => {
 
   const memHistory = serverTelemetryHistory[satId] || [];
   res.json(memHistory.slice(-limitVal));
+});
+
+// REST Endpoint: Run root cause analysis on a satellite
+app.get('/api/telemetry/rca', (req, res) => {
+  const { satelliteId } = req.query;
+  const satId = satelliteId || 'gaganyaan';
+  const sat = serverTelemetry.satellites.find(s => s.id === satId);
+  if (!sat) {
+    return res.status(404).json({ error: "Satellite not found" });
+  }
+  const result = graph.analyzeRootCause(sat, serverTelemetry.spaceWeather);
+  res.json(result);
 });
 
 // REST Endpoint: Proxy Search query to CelesTrak to prevent client CORS blocks
@@ -718,6 +1126,17 @@ app.post('/api/gemini', async (req, res) => {
               },
               required: ["satelliteId", "deltaV", "direction"]
             }
+          },
+          {
+            name: "get_root_cause_analysis",
+            description: "Retrieve a directed causality tree mapping the root causes of active subsystem failures and environmental space weather anomalies.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                satelliteId: { type: "STRING", description: "Unique ID of the satellite under review (e.g. 'gaganyaan')." }
+              },
+              required: ["satelliteId"]
+            }
           }
         ]
       }
@@ -732,7 +1151,7 @@ You monitor Indian satellites (including Gaganyaan-1, Cartosat-3, NavIC constell
 You understand the "butterfly effect" of solar activity on spacecraft subsystems.
 When the user asks you questions, requests checks, or coordinates maneuvers:
 1. First, query 'get_satellite_states' to review coordinates and threat levels, and query 'get_active_conjunctions' to inspect active satellite proximity danger corridors.
-2. Call 'get_anomaly_diagnostics' to fetch the real-time health telemetry variables (thermals, SNR, voltage) of active satellites. If any systems are degraded (battery temp > 45°C or comms SNR < 12dB), report these specific anomalies to the operator and analyze how they correlate with the active solar weather.
+2. Call 'get_anomaly_diagnostics' and 'get_root_cause_analysis' to fetch the real-time health telemetry variables and directed causality trees of active satellites. If any systems are degraded (battery temp > 45°C or comms SNR < 12dB), report these specific anomalies to the operator and analyze how they correlate with the active solar weather using the root cause analysis graph.
 3. If any satellite is flagged in the active conjunction corridors list, run 'calculate_avoidance_vector' to get orbital thrust metrics for that target satellite.
 4. Before calling 'execute_orbital_burn' to execute a burn, you MUST consult the Aditya Solar Physics Analyst using the 'consult_solar_physics_analyst' tool to check space weather safety.
 5. If the Analyst reports status 'ABORT', or if critical spacecraft anomalies (like battery temp > 48°C) render the electronics too sensitive for thrust ignition, abort the maneuver. Explain the solar storm / ESD radiation hazard details to the operator and do NOT call 'execute_orbital_burn'.
@@ -895,7 +1314,9 @@ Return your response strictly in the following JSON format:
             dirStr,
             sat ? sat.alt : 405.23,
             debris.alt,
-            safetyMargin
+            safetyMargin,
+            sat && sat.thermal ? sat.thermal.thermalStress : 0.0,
+            sat && sat.radiation ? sat.radiation.seuProbability : 0.0
           );
 
           if (validation.success) {
@@ -954,6 +1375,14 @@ Return your response strictly in the following JSON format:
           const { satelliteId, deltaV, direction } = args;
           const result = await executeManeuver(satelliteId, deltaV, direction, `Gemini Agentic Command (${model.model})`);
           toolResult = result;
+        } else if (name === "get_root_cause_analysis") {
+          const satId = args.satelliteId;
+          const sat = serverTelemetry.satellites.find(s => s.id === satId);
+          if (sat) {
+            toolResult = graph.analyzeRootCause(sat, serverTelemetry.spaceWeather);
+          } else {
+            toolResult = { error: `Space asset ID "${satId}" not found in tracking catalog.` };
+          }
         }
 
         executionLogs.push({
@@ -1068,47 +1497,105 @@ setInterval(() => {
       };
     }
 
-    // 2. Propagate orbits (simulate orbital movement via simple longitude increment)
-    if (s.id !== 'cosmos-debris') {
-      s.orbit.lng = (s.orbit.lng + 0.05) % 180;
-    } else {
-      s.orbit.lng = (s.orbit.lng + 0.051) % 180;
+    // 2. Propagate orbits (simulate orbital movement via J2 RAAN precession & Keplerian propagation)
+    const RE = 6378.137;
+    const GM = 398600.44;
+    const J2 = 1.08263e-3;
+    const a = RE + s.orbit.alt;
+    const n = Math.sqrt(GM / (a * a * a)); // rad/s
+    
+    let inclDeg = 51.64;
+    let raanDeg = 120.5;
+    let argLatDeg = 30.0;
+    
+    if (s.tle2 && s.tle2.length > 40) {
+      const parts = s.tle2.trim().split(/\s+/);
+      if (parts.length >= 7) {
+        inclDeg = parseFloat(parts[2]) || 51.64;
+        raanDeg = parseFloat(parts[3]) || 120.5;
+        const perigee = parseFloat(parts[5]) || 0;
+        const meanAnomaly = parseFloat(parts[6]) || 0;
+        argLatDeg = perigee + meanAnomaly;
+      }
     }
-    if (s.orbit.lat === undefined || isNaN(s.orbit.lat)) {
-      s.orbit.lat = 10.0 + Math.random() * 20.0;
+
+    const inclRad = inclDeg * Math.PI / 180;
+    const dOmega = -1.5 * J2 * Math.pow(RE / a, 2) * Math.cos(inclRad) * n; // rad/s
+    
+    if (!s.orbit.epochTime) {
+      s.orbit.epochTime = Date.now() / 1000;
     }
-    if (s.orbit.velocity === undefined || isNaN(s.orbit.velocity)) {
-      s.orbit.velocity = s.id === 'navic-1i' ? 3.08 : 7.6;
-    }
+    const t = (Date.now() / 1000) - s.orbit.epochTime;
+    
+    const raan = (raanDeg * Math.PI / 180) + dOmega * t;
+    const u = (argLatDeg * Math.PI / 180) + n * t;
+    
+    const x = a * (Math.cos(u) * Math.cos(raan) - Math.sin(u) * Math.sin(raan) * Math.cos(inclRad));
+    const y = a * (Math.cos(u) * Math.sin(raan) + Math.sin(u) * Math.cos(raan) * Math.cos(inclRad));
+    const z = a * Math.sin(u) * Math.sin(inclRad);
+    
+    const omegaE = 7.292115e-5;
+    const thetaGST = omegaE * t;
+    
+    const xECEF = x * Math.cos(thetaGST) + y * Math.sin(thetaGST);
+    const yECEF = -x * Math.sin(thetaGST) + y * Math.cos(thetaGST);
+    const zECEF = z;
+    
+    const rECEF = Math.sqrt(xECEF * xECEF + yECEF * yECEF + zECEF * zECEF);
+    s.orbit.lat = parseFloat((Math.asin(zECEF / rECEF) * 180 / Math.PI).toFixed(4));
+    let lngVal = Math.atan2(yECEF, xECEF) * 180 / Math.PI;
+    lngVal = (lngVal + 180) % 360;
+    if (lngVal < 0) lngVal += 360;
+    s.orbit.lng = parseFloat((lngVal - 180).toFixed(4));
+    s.orbit.velocity = parseFloat((n * a).toFixed(2));
 
     const isDebris = s.id === 'cosmos-debris' || s.category === 'debris';
 
     if (!isDebris) {
-      // 3. Solar Eclipse Model
+      // 3. Penumbral Shadow Model
       const rad = Math.PI / 180;
       const sunLng = ((Date.now() / 240000) * 360) % 360; // 4 min full cycle
       const cosPhi = Math.cos(s.orbit.lat * rad) * Math.cos((s.orbit.lng - sunLng) * rad);
       const sinPhi = Math.sqrt(1 - cosPhi * cosPhi);
       const isBehindEarth = cosPhi < 0;
-      const isShadowBlocked = (6378.137 + s.orbit.alt) * sinPhi < 6378.137;
-      s.orbit.inEclipse = isBehindEarth && isShadowBlocked;
+      
+      const shadowFactor = isBehindEarth && (RE + s.orbit.alt) * sinPhi < RE + 100 
+        ? Math.min(1.0, Math.max(0.0, (RE + 100 - (RE + s.orbit.alt) * sinPhi) / 100)) 
+        : 0.0;
+        
+      s.orbit.inEclipse = shadowFactor > 0.0;
 
       let deltaSoC = 0.0;
       let dT = 0.0;
 
-      // 4. Solar Panel Power Model
+      // 4. Solar Panel Power Model (with cumulative radiation cell degradation)
       const cosTheta = s.orbit.inEclipse ? 0.0 : Math.max(0.1, cosPhi);
       const maxPower = s.id === 'navic-1i' ? 450.0 : 280.0;
-      s.power.solarGenerationW = s.orbit.inEclipse ? 0.0 : parseFloat((maxPower * cosTheta).toFixed(1));
-      s.power.solarV = s.orbit.inEclipse ? 0.0 : parseFloat((30.0 + 4.1 * cosTheta + (Math.random() - 0.5) * 0.3).toFixed(2));
+      const cumulativeDose = s.radiation ? s.radiation.cumulativeDoseRad : 4.12;
+      const generation = maxPower * cosTheta * (1.0 - shadowFactor) * Math.max(0.70, 1.0 - cumulativeDose * 0.005);
       
+      s.power.solarGenerationW = parseFloat(Math.max(0.0, generation).toFixed(1));
+      s.power.solarV = shadowFactor === 1.0 ? 0.0 : parseFloat((30.0 + 4.1 * cosTheta * (1.0 - shadowFactor) + (Math.random() - 0.5) * 0.3).toFixed(2));
+      
+      // 5. Active Thermostat control & Louvers Modulation
+      s.thermal.radiatorEfficiency = s.thermal.battTemp > 40.0 ? 0.98 : (s.thermal.battTemp < 15.0 ? 0.45 : 0.85);
+      
+      const basePower = s.id === 'navic-1i' ? 180.0 : 120.0;
+      if (s.thermal.battTemp < 5.0) {
+        s.power.powerConsumptionW = basePower + 40.0;
+        s.thermal.heaterStatus = "ACTIVE";
+      } else {
+        s.power.powerConsumptionW = basePower;
+        s.thermal.heaterStatus = "OFF";
+      }
+
       const netPower = s.power.solarGenerationW - s.power.powerConsumptionW;
       const capacityWh = s.id === 'navic-1i' ? 5000.0 : 2000.0;
       // SoC speed-up factor 300
       deltaSoC = (netPower / (capacityWh * 3600)) * 100 * 300;
       s.power.batterySoC = parseFloat(Math.max(0, Math.min(100, s.power.batterySoC + deltaSoC)).toFixed(2));
 
-      // 5. Subsystem Thermal Model
+      // 6. Subsystem Thermal Model
       const T_space = 3.0; // Kelvin
       const sigma = 5.67e-8;
       const T_kelvin = s.thermal.battTemp + 273.15;
@@ -1116,6 +1603,9 @@ setInterval(() => {
       const Q_out = sigma * s.thermal.radiatorEfficiency * 1.5 * (Math.pow(T_kelvin, 4) - Math.pow(T_space, 4));
       // Thermal speed-up step (dt = 60s)
       dT = ((Q_in - Q_out) / 25000.0) * 60;
+      if (s.thermal.heaterStatus === "ACTIVE") {
+        dT += 0.25; // +0.25 C/s heat generation
+      }
       s.thermal.battTemp = parseFloat(Math.max(-50, Math.min(100, s.thermal.battTemp + dT)).toFixed(2));
 
       const T_expected_kelvin = s.thermal.expectedBattTemp + 273.15;
@@ -1124,7 +1614,7 @@ setInterval(() => {
       s.thermal.expectedBattTemp = parseFloat(Math.max(-50, Math.min(100, s.thermal.expectedBattTemp + dT_expected)).toFixed(2));
       s.thermal.thermalStress = parseFloat(Math.abs(s.thermal.battTemp - s.thermal.expectedBattTemp).toFixed(2));
 
-      // 6. Space Radiation Model
+      // 7. Space Radiation Model
       const gamma = 1e-5;
       s.radiation.cumulativeDoseRad = parseFloat((s.radiation.cumulativeDoseRad + gamma * weather.solarProtonFlux).toFixed(4));
       const P_seu = 0.00005 * weather.solarProtonFlux * Math.exp(weather.kpIndex / 3.0);
@@ -1133,16 +1623,16 @@ setInterval(() => {
         s.radiation.seuCount++;
       }
 
-      // 7. Communications Link SNR
+      // 8. Communications Link SNR
       const noise = (Math.random() - 0.5) * 1.0;
       s.communications.downlinkSNR = parseFloat((26.5 - weather.kpIndex * 2.2 + noise).toFixed(1));
       s.communications.downlinkSNR = Math.max(5.0, Math.min(30.0, s.communications.downlinkSNR));
       s.communications.signalQuality = parseFloat((s.communications.downlinkSNR / 30.0).toFixed(2));
 
-      // 8. Fuel Propellant Pressure
+      // 9. Fuel Propellant Pressure
       s.propulsion.fuelPressurePsi = parseFloat(Math.max(10.0, s.propulsion.fuelPressurePsi + (Math.random() - 0.5) * 0.3).toFixed(1));
 
-      // 9. LEO Orbit Drag Decay Model
+      // 10. LEO Orbit Drag Decay Model
       let deltaAlt = 0.0;
       if (s.orbit.alt < 600) {
         const H_base = 50.0;
@@ -1154,31 +1644,25 @@ setInterval(() => {
         s.orbit.alt = Math.max(100, s.orbit.alt + deltaAlt);
       }
 
-      // 9.1 Anomaly Detection and Predictive Diagnostics (V3.4)
+      // 10.1 Anomaly Detection and Predictive Diagnostics (V3.4)
       const activeAnomalies = [];
       
-      // Thermal Stress anomaly: stress > 5.0 °C
       if (s.thermal.thermalStress > 5.0) {
         activeAnomalies.push("THERMAL_STRESS_ANOMALY");
       }
-      // Low Power anomaly: SoC < 20.0%
       if (s.power.batterySoC < 20.0) {
         activeAnomalies.push("LOW_POWER_ANOMALY");
       }
-      // Ionospheric Scintillation: SNR < 12.0 dB during severe solar weather
       if (s.communications.downlinkSNR < 12.0 && isStorm) {
         activeAnomalies.push("IONOSPHERIC_SCINTILLATION_ANOMALY");
       }
-      // Drag spike: altitude decay rate is faster than expected (spiked wind speed > 500 km/s and alt < 600)
       if (s.orbit.alt < 600.0 && weather.solarWindSpeed > 500.0 && deltaAlt < -0.005) {
         activeAnomalies.push("DRAG_DECAY_ANOMALY");
       }
-      // Radiation SEU Risk: SEU probability > 0.01
       if (s.radiation.seuProbability > 0.01) {
         activeAnomalies.push("RADIATION_SEU_RISK");
       }
 
-      // Calculations for predictions:
       let depletionTime = -1;
       if (deltaSoC < 0) {
         depletionTime = parseFloat((s.power.batterySoC / -deltaSoC).toFixed(1));
@@ -1187,13 +1671,13 @@ setInterval(() => {
       let thermalTime = -1;
       if (dT > 0) {
         thermalTime = parseFloat(((48.0 - s.thermal.battTemp) / dT).toFixed(1));
-        if (thermalTime < 0) thermalTime = 0; // already exceeded
+        if (thermalTime < 0) thermalTime = 0;
       }
 
       let reentryTime = -1;
       if (s.orbit.alt < 600.0 && deltaAlt < 0) {
         reentryTime = parseFloat(((s.orbit.alt - 150.0) / -deltaAlt).toFixed(1));
-        if (reentryTime < 0) reentryTime = 0; // already decayed
+        if (reentryTime < 0) reentryTime = 0;
       }
 
       s.anomalies = {

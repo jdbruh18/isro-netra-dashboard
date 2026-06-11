@@ -65,6 +65,102 @@ export const ISRO_TLE_CATALOG = [
     status: "active",
     threatLevel: "NORMAL",
     category: "indian"
+  },
+  {
+    id: "iss",
+    name: "International Space Station",
+    owner: "NASA/ROSCOSMOS",
+    type: "Space Station",
+    tle1: "1 25544U 98067A   26155.50000000  .00010000  00000-0  10000-3 0  9992",
+    tle2: "2 25544  51.6400 140.2000 0005000  45.0000 315.0000 15.50000000    15",
+    altOffset: 0,
+    status: "active",
+    threatLevel: "NORMAL",
+    category: "active"
+  },
+  {
+    id: "hubble",
+    name: "Hubble Space Telescope",
+    owner: "NASA/ESA",
+    type: "Space Telescope",
+    tle1: "1 20580U 90037B   26155.50000000  .00001000  00000-0  50000-4 0  9993",
+    tle2: "2 20580  28.4700 160.1000 0003000  90.0000 270.0000 15.08000000    13",
+    altOffset: 0,
+    status: "active",
+    threatLevel: "NORMAL",
+    category: "active"
+  },
+  {
+    id: "starlink-1007",
+    name: "Starlink-1007",
+    owner: "SPACEX",
+    type: "Communication Satellite",
+    tle1: "1 44713U 19074A   26155.50000000  .00005000  00000-0  80000-4 0  9994",
+    tle2: "2 44713  53.0000 180.5000 0001000  30.0000 330.0000 15.06000000    11",
+    altOffset: 0,
+    status: "active",
+    threatLevel: "NORMAL",
+    category: "starlink"
+  },
+  {
+    id: "soho",
+    name: "SOHO Solar Observatory",
+    owner: "ESA/NASA",
+    type: "Solar Probe",
+    tle1: "1 23743U 95115A   26155.50000000  .00000010  00000-0  00000-0 0  9995",
+    tle2: "2 23743  23.4400 110.2000 0010000 180.0000 180.0000  1.00270000    12",
+    altOffset: 0,
+    status: "active",
+    threatLevel: "NORMAL",
+    category: "active"
+  },
+  {
+    id: "jwst",
+    name: "James Webb Space Telescope",
+    owner: "NASA/ESA/CSA",
+    type: "Space Telescope",
+    tle1: "1 50463U 21130A   26155.50000000  .00000005  00000-0  00000-0 0  9996",
+    tle2: "2 50463  39.5800 135.2000 0001000  60.0000 300.0000  0.03660000    13",
+    altOffset: 0,
+    status: "active",
+    threatLevel: "NORMAL",
+    category: "active"
+  },
+  {
+    id: "parker",
+    name: "Parker Solar Probe",
+    owner: "NASA",
+    type: "Solar Probe",
+    tle1: "1 43613U 18065A   26155.50000000  .00000010  00000-0  00000-0 0  9997",
+    tle2: "2 43613  15.0000  45.0000 0005000  90.0000 270.0000  0.07300000    14",
+    altOffset: 0,
+    status: "active",
+    threatLevel: "NORMAL",
+    category: "active"
+  },
+  {
+    id: "tiangong",
+    name: "Tiangong Space Station",
+    owner: "CNSA",
+    type: "Space Station",
+    tle1: "1 48274U 21035A   26155.50000000  .00015000  00000-0  15000-3 0  9991",
+    tle2: "2 48274  41.5840 150.3200 0008000  50.0000 310.0000 15.62000000    14",
+    altOffset: 0,
+    status: "active",
+    threatLevel: "NORMAL",
+    category: "active"
+  },
+  {
+    id: "voyager1",
+    name: "Voyager 1",
+    owner: "NASA",
+    type: "Interstellar Probe",
+    tle1: "1 10312U 77076A   26155.50000000  .00000000  00000-0  00000-0 0  9999",
+    tle2: "2 10312  35.7000 280.5000 0000000   0.0000   0.0000  0.00000000     1",
+    altOffset: 0,
+    status: "active",
+    threatLevel: "NORMAL",
+    category: "active"
   }
 ];
 
