@@ -1,0 +1,23 @@
+{
+  "short_name": "ISRO NETRA",
+  "name": "ISRO NETRA - Space Domain Awareness Dashboard",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/nolan/256/radar.png",
+      "type": "image/png",
+      "sizes": "256x256",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://img.icons8.com/nolan/512/radar.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#05050d",
+  "theme_color": "#00f0ff",
+  "display": "standalone",
+  "orientation": "any"
+}

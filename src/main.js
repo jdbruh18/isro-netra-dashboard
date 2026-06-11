@@ -18,8 +18,75 @@ let socket = null;
 let useWebsocket = false;
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // PWA Service Worker Registration
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').then(reg => {
+        console.log('PWA Service Worker registered with scope:', reg.scope);
+      }).catch(err => {
+        console.warn('PWA Service Worker registration failed:', err);
+      });
+    });
+  }
+
   // 1. Render Lucide Icons
   lucide.createIcons();
+
+  // Multi-page routing controller
+  const navTabs = document.querySelectorAll('.nav-tab');
+  const views = document.querySelectorAll('.dashboard-view');
+  navTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const targetViewId = tab.getAttribute('data-target');
+      
+      navTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      
+      views.forEach(v => {
+        v.classList.remove('active');
+        if (v.id === targetViewId) {
+          v.classList.add('active');
+        }
+      });
+      
+      audio.playClick();
+      
+      // Calibrate layouts and dispatch activation events on transitions
+      if (targetViewId === 'view-tracking') {
+        setTimeout(() => {
+          invalidateMapSize();
+          window.dispatchEvent(new Event('resize'));
+        }, 100);
+      } else if (targetViewId === 'view-telemetry') {
+        document.dispatchEvent(new CustomEvent('subsystem-charts-activated'));
+      } else if (targetViewId === 'view-diagnostics') {
+        document.dispatchEvent(new CustomEvent('subsystem-rca-activated'));
+      } else if (targetViewId === 'view-gateway') {
+        document.dispatchEvent(new CustomEvent('integrations-activated'));
+      }
+    });
+  });
+
+  // Collapsible Asset Index Sidebar
+  const btnToggleAssets = document.getElementById('btn-toggle-assets');
+  const panelAssets = document.getElementById('panel-assets');
+  if (btnToggleAssets && panelAssets) {
+    // Start collapsed on small screens to save space
+    if (window.innerWidth <= 768) {
+      panelAssets.classList.add('collapsed');
+      const span = btnToggleAssets.querySelector('span');
+      if (span) span.textContent = 'SHOW INDEX';
+    }
+    
+    btnToggleAssets.addEventListener('click', () => {
+      panelAssets.classList.toggle('collapsed');
+      audio.playClick();
+      const span = btnToggleAssets.querySelector('span');
+      if (span) {
+        span.textContent = panelAssets.classList.contains('collapsed') ? 'SHOW INDEX' : 'HIDE INDEX';
+      }
+    });
+  }
 
   // 2. Play initial click to trigger Audio Context availability on first user click
   document.body.addEventListener('click', () => {

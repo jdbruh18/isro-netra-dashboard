@@ -2,9 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ISRO NETRA - Space Domain Awareness AI Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ISRO NETRA - Space Domain Awareness Dashboard</title>
   <meta name="description" content="AI-Powered Space Domain Awareness and Gaganyaan Mission Trajectory Tracker - ISRO NETRA Control Center.">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#05050d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="styles/main.css">
   <link rel="stylesheet" href="styles/hud.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
@@ -18,7 +22,7 @@
     <!-- Header Area -->
     <header class="hud-header">
       <div class="logo-section">
-        <i data-lucide="radar" class="logo-icon text-cyan" style="width: 24px; height: 24px;"></i>
+        <i data-lucide="radar" class="logo-icon text-cyan" style="width: 20px; height: 20px;"></i>
         <h1>ISRO NETRA</h1>
         <span class="logo-badge">SDA CENTER</span>
       </div>
@@ -43,357 +47,375 @@
       </div>
 
       <div style="display: flex; gap: 8px;">
-        <button id="btn-sound-toggle" class="hud-btn" title="Toggle audio feedback">
-          <i data-lucide="volume-2" style="width: 14px; height: 14px;"></i>
+        <button id="btn-sound-toggle" class="hud-btn" title="Toggle audio feedback" style="padding: 4px 8px; font-size: 0.65rem;">
+          <i data-lucide="volume-2" style="width: 12px; height: 12px;"></i>
           <span>MUTE OFF</span>
         </button>
-        <button id="btn-alarm-toggle" class="hud-btn danger" title="Toggle emergency alerts">
-          <i data-lucide="bell" style="width: 14px; height: 14px;"></i>
+        <button id="btn-alarm-toggle" class="hud-btn danger" title="Toggle emergency alerts" style="padding: 4px 8px; font-size: 0.65rem;">
+          <i data-lucide="bell" style="width: 12px; height: 12px;"></i>
           <span>ALARM OFF</span>
         </button>
       </div>
     </header>
 
-    <!-- Main Workspace Grid -->
+    <!-- Refined Top Navbar (Figma-grade minimal cyber style) -->
+    <nav class="hud-navbar">
+      <button class="nav-tab active" data-target="view-tracking">
+        <i data-lucide="globe"></i>
+        <span>01 // ORBITAL TRACKING</span>
+      </button>
+      <button class="nav-tab" data-target="view-telemetry">
+        <i data-lucide="terminal"></i>
+        <span>02 // SYSTEMS TELEMETRY</span>
+      </button>
+      <button class="nav-tab" data-target="view-diagnostics">
+        <i data-lucide="shield-alert"></i>
+        <span>03 // WEATHER & DIAGNOSTICS</span>
+      </button>
+      <button class="nav-tab" data-target="view-gateway">
+        <i data-lucide="cpu"></i>
+        <span>04 // INTEGRATION GATEWAY</span>
+      </button>
+    </nav>
+
+    <!-- Main Viewport Area -->
     <main class="hud-body">
       
-      <!-- Left Panel: Space Asset List -->
-      <section class="hud-panel panel-operations" id="panel-assets">
-        <div class="panel-header">
-          <h2 class="panel-title">
-            <i data-lucide="satellite" style="width: 16px; height: 16px;"></i>
-            Space Assets
-          </h2>
-          <span style="font-family: var(--font-mono); font-size: 0.65rem; color: #64748b;">
-            Tracked: <span style="color: hsl(var(--color-cyan));" id="lbl-asset-count">0</span>
-          </span>
-        </div>
-        <div class="panel-content">
-          <!-- Catalog Search Input -->
-          <div class="search-container" style="display: flex; gap: 8px; margin-bottom: 12px;">
-            <input type="text" id="inp-catalog-search" class="terminal-input-box" placeholder="NORAD ID or Name..." style="padding: 6px 10px; font-size: 0.75rem; margin-top: 0;" />
-            <button id="btn-catalog-search" class="hud-btn" style="padding: 6px 10px; flex-shrink: 0;">TRACK</button>
-          </div>
+      <!-- View 1: Orbital Tracking Room -->
+      <div id="view-tracking" class="dashboard-view active">
+        <!-- Floating overlay trigger for Asset List -->
+        <button id="btn-toggle-assets" class="hud-btn" style="position: absolute; top: 15px; left: 15px; z-index: 12; border-radius: 2px; padding: 6px 10px;">
+          <i data-lucide="menu" style="width: 12px; height: 12px;"></i>
+          <span>ASSET INDEX</span>
+        </button>
 
-          <!-- Category Filters Tabs -->
-          <div class="category-tabs" style="display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px; overflow-x: auto; flex-shrink: 0;">
-            <button class="panel-action active" id="tab-cat-all" data-category="all" style="font-size: 0.6rem; padding: 2px 4px;">ALL</button>
-            <button class="panel-action" id="tab-cat-indian" data-category="indian" style="font-size: 0.6rem; padding: 2px 4px;">INDIAN</button>
-            <button class="panel-action" id="tab-cat-active" data-category="active" style="font-size: 0.6rem; padding: 2px 4px;">ACTIVE</button>
-            <button class="panel-action" id="tab-cat-debris" data-category="debris" style="font-size: 0.6rem; padding: 2px 4px;">DEBRIS</button>
-            <button class="panel-action" id="tab-cat-starlink" data-category="starlink" style="font-size: 0.6rem; padding: 2px 4px;">STARLINK</button>
+        <!-- Left Panel: Space Asset List (Overlayed sidebar) -->
+        <section class="hud-panel panel-operations floating-sidebar" id="panel-assets">
+          <div class="panel-header">
+            <h2 class="panel-title">
+              <i data-lucide="satellite"></i> Space Assets
+            </h2>
+            <span style="font-family: var(--font-mono); font-size: 0.65rem; color: #64748b;">
+              Tracked: <span style="color: hsl(var(--color-cyan));" id="lbl-asset-count">0</span>
+            </span>
           </div>
+          <div class="panel-content">
+            <!-- Catalog Search Input -->
+            <div class="search-container" style="display: flex; gap: 8px; margin-bottom: 12px;">
+              <input type="text" id="inp-catalog-search" class="terminal-input-box" placeholder="NORAD ID or Name..." style="padding: 6px 10px; font-size: 0.75rem; margin-top: 0;" />
+              <button id="btn-catalog-search" class="hud-btn" style="padding: 6px 10px; flex-shrink: 0;">TRACK</button>
+            </div>
 
-          <div class="satellite-list" id="asset-list-container">
-            <!-- Satellite rows rendered dynamically -->
-          </div>
-          
-          <!-- Detailed Satellite Telemetry Overlay -->
-          <div class="sat-details-card" style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px;">
-            <div class="sat-details-title" id="sat-detail-name">Gaganyaan Crew Module</div>
-            <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
-              <div class="sat-details-row">
-                <span class="sat-details-lbl">Altitude</span>
-                <span class="sat-details-val" id="sat-detail-alt">405.2 km</span>
-              </div>
-              <div class="sat-details-row">
-                <span class="sat-details-lbl">Velocity</span>
-                <span class="sat-details-val" id="sat-detail-vel">7.67 km/s</span>
-              </div>
-              <div class="sat-details-row">
-                <span class="sat-details-lbl">Latitude</span>
-                <span class="sat-details-val" id="sat-detail-lat">15.3421° N</span>
-              </div>
-              <div class="sat-details-row">
-                <span class="sat-details-lbl">Longitude</span>
-                <span class="sat-details-val" id="sat-detail-lng">75.8922° E</span>
-              </div>
-              <div class="sat-details-row">
-                <span class="sat-details-lbl">Mission Status</span>
-                <span class="sat-details-val normal" id="sat-detail-status">ORBIT OK</span>
-              </div>
-              
-              <!-- Spacecraft Digital Twin Subsystems (V3.1) -->
-              <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.05);">
-                <div style="font-size: 0.6rem; color: #64748b; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px;">Digital Twin Subsystems</div>
-                <div style="display: flex; flex-direction: column; gap: 4px;">
-                  <!-- Orbit Subsystem -->
-                  <div class="sat-details-row">
-                    <span class="sat-details-lbl">Eclipse State</span>
-                    <span class="sat-details-val" id="sat-detail-eclipse">SUNLIGHT</span>
-                  </div>
-                  <!-- Power Subsystem -->
-                  <div class="sat-details-row">
-                    <span class="sat-details-lbl">Solar Array / Gen</span>
-                    <span class="sat-details-val"><span id="sat-detail-solar">32.4 V</span> / <span id="sat-detail-solar-gen">280 W</span></span>
-                  </div>
-                  <div class="sat-details-row">
-                    <span class="sat-details-lbl">Battery SoC</span>
-                    <span class="sat-details-val" id="sat-detail-soc">92.5%</span>
-                  </div>
-                  <!-- Thermal Subsystem -->
-                  <div class="sat-details-row">
-                    <span class="sat-details-lbl">Battery Temp / Stress</span>
-                    <span class="sat-details-val"><span id="sat-detail-batt-temp">28.5°C</span> / <span id="sat-detail-thermal-stress">0.0°C</span></span>
-                  </div>
-                  <!-- Comms Subsystem -->
-                  <div class="sat-details-row">
-                    <span class="sat-details-lbl">Comms Link SNR</span>
-                    <span class="sat-details-val" id="sat-detail-snr">24.5 dB</span>
-                  </div>
-                  <!-- Radiation Subsystem -->
-                  <div class="sat-details-row">
-                    <span class="sat-details-lbl">Rad Dose / SEU Count</span>
-                    <span class="sat-details-val"><span id="sat-detail-radiation">4.12 Rad</span> / <span id="sat-detail-seu">0 SEU</span></span>
-                  </div>
-                  <!-- Propulsion Subsystem -->
-                  <div class="sat-details-row">
-                    <span class="sat-details-lbl">Fuel Mass / Pressure</span>
-                    <span class="sat-details-val"><span id="sat-detail-propellant-mass">400.0 kg</span> / <span id="sat-detail-fuel">220 psi</span></span>
+            <!-- Category Filters Tabs -->
+            <div class="category-tabs" style="display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px; overflow-x: auto; flex-shrink: 0;">
+              <button class="panel-action active" id="tab-cat-all" data-category="all" style="font-size: 0.6rem; padding: 2px 4px;">ALL</button>
+              <button class="panel-action" id="tab-cat-indian" data-category="indian" style="font-size: 0.6rem; padding: 2px 4px;">INDIAN</button>
+              <button class="panel-action" id="tab-cat-active" data-category="active" style="font-size: 0.6rem; padding: 2px 4px;">ACTIVE</button>
+              <button class="panel-action" id="tab-cat-debris" data-category="debris" style="font-size: 0.6rem; padding: 2px 4px;">DEBRIS</button>
+              <button class="panel-action" id="tab-cat-starlink" data-category="starlink" style="font-size: 0.6rem; padding: 2px 4px;">STARLINK</button>
+            </div>
+
+            <div class="satellite-list" id="asset-list-container" style="flex: 1; overflow-y: auto;">
+              <!-- Satellite rows rendered dynamically -->
+            </div>
+            
+            <!-- Detailed Satellite Telemetry Overlay -->
+            <div class="sat-details-card" style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px;">
+              <div class="sat-details-title" id="sat-detail-name">Gaganyaan Crew Module</div>
+              <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
+                <div class="sat-details-row">
+                  <span class="sat-details-lbl">Altitude</span>
+                  <span class="sat-details-val" id="sat-detail-alt">405.2 km</span>
+                </div>
+                <div class="sat-details-row">
+                  <span class="sat-details-lbl">Velocity</span>
+                  <span class="sat-details-val" id="sat-detail-vel">7.67 km/s</span>
+                </div>
+                <div class="sat-details-row">
+                  <span class="sat-details-lbl">Latitude</span>
+                  <span class="sat-details-val" id="sat-detail-lat">15.3421° N</span>
+                </div>
+                <div class="sat-details-row">
+                  <span class="sat-details-lbl">Longitude</span>
+                  <span class="sat-details-val" id="sat-detail-lng">75.8922° E</span>
+                </div>
+                <div class="sat-details-row">
+                  <span class="sat-details-lbl">Mission Status</span>
+                  <span class="sat-details-val normal" id="sat-detail-status">ORBIT OK</span>
+                </div>
+                
+                <!-- Spacecraft Digital Twin Subsystems -->
+                <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.05);">
+                  <div style="font-size: 0.6rem; color: #64748b; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px;">Digital Twin Subsystems</div>
+                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <div class="sat-details-row">
+                      <span class="sat-details-lbl">Eclipse State</span>
+                      <span class="sat-details-val" id="sat-detail-eclipse">SUNLIGHT</span>
+                    </div>
+                    <div class="sat-details-row">
+                      <span class="sat-details-lbl">Solar Array / Gen</span>
+                      <span class="sat-details-val"><span id="sat-detail-solar">32.4 V</span> / <span id="sat-detail-solar-gen">280 W</span></span>
+                    </div>
+                    <div class="sat-details-row">
+                      <span class="sat-details-lbl">Battery SoC</span>
+                      <span class="sat-details-val" id="sat-detail-soc">92.5%</span>
+                    </div>
+                    <div class="sat-details-row">
+                      <span class="sat-details-lbl">Battery Temp / Stress</span>
+                      <span class="sat-details-val"><span id="sat-detail-batt-temp">28.5°C</span> / <span id="sat-detail-thermal-stress">0.0°C</span></span>
+                    </div>
+                    <div class="sat-details-row">
+                      <span class="sat-details-lbl">Comms Link SNR</span>
+                      <span class="sat-details-val" id="sat-detail-snr">24.5 dB</span>
+                    </div>
+                    <div class="sat-details-row">
+                      <span class="sat-details-lbl">Rad Dose / SEU Count</span>
+                      <span class="sat-details-val"><span id="sat-detail-radiation">4.12 Rad</span> / <span id="sat-detail-seu">0 SEU</span></span>
+                    </div>
+                    <div class="sat-details-row">
+                      <span class="sat-details-lbl">Fuel Mass / Pressure</span>
+                      <span class="sat-details-val"><span id="sat-detail-propellant-mass">400.0 kg</span> / <span id="sat-detail-fuel">220 psi</span></span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <!-- Predictive Failure Diagnostics & Active Anomalies (V3.4) -->
-              <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.05);">
-                <div style="font-size: 0.6rem; color: #64748b; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px;">Predictive Diagnostics (V3.4)</div>
-                <div style="display: flex; flex-direction: column; gap: 4px;">
-                  <div class="sat-details-row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                    <span class="sat-details-lbl">Active Anomalies</span>
-                    <div id="sat-detail-active-anomalies" class="sat-details-val normal" style="font-size: 0.65rem; word-break: break-all;">NONE</div>
-                  </div>
-                  <div class="sat-details-row">
-                    <span class="sat-details-lbl">Est. Thermal Limit</span>
-                    <span class="sat-details-val" id="sat-detail-pred-thermal">STABLE</span>
-                  </div>
-                  <div class="sat-details-row">
-                    <span class="sat-details-lbl">Est. Power Margin</span>
-                    <span class="sat-details-val" id="sat-detail-pred-power">STABLE</span>
-                  </div>
-                  <div class="sat-details-row">
-                    <span class="sat-details-lbl">Est. Orbit Life</span>
-                    <span class="sat-details-val" id="sat-detail-pred-reentry">STABLE</span>
+                <!-- Predictive Failure Diagnostics & Active Anomalies -->
+                <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.05);">
+                  <div style="font-size: 0.6rem; color: #64748b; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px;">Predictive Diagnostics</div>
+                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <div class="sat-details-row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                      <span class="sat-details-lbl">Active Anomalies</span>
+                      <div id="sat-detail-active-anomalies" class="sat-details-val normal" style="font-size: 0.65rem; word-break: break-all;">NONE</div>
+                    </div>
+                    <div class="sat-details-row">
+                      <span class="sat-details-lbl">Est. Thermal Limit</span>
+                      <span class="sat-details-val" id="sat-detail-pred-thermal">STABLE</span>
+                    </div>
+                    <div class="sat-details-row">
+                      <span class="sat-details-lbl">Est. Power Margin</span>
+                      <span class="sat-details-val" id="sat-detail-pred-power">STABLE</span>
+                    </div>
+                    <div class="sat-details-row">
+                      <span class="sat-details-lbl">Est. Orbit Life</span>
+                      <span class="sat-details-val" id="sat-detail-pred-reentry">STABLE</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Center Panel: 3D Orbital Canvas -->
-      <section class="hud-panel panel-orbits" id="panel-orbital-tracker">
-        <div class="panel-header">
-          <div style="display: flex; gap: 12px; align-items: center;">
-            <h2 class="panel-title" id="lbl-tracker-title">
-              <i data-lucide="globe" style="width: 16px; height: 16px;"></i>
-              3D Space Domain Map
-            </h2>
-            <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.3); padding: 2px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05); flex-shrink: 0;">
-              <button class="panel-action active" id="btn-toggle-3d" style="font-size: 0.6rem; padding: 2px 6px;">3D GLOBE</button>
-              <button class="panel-action" id="btn-toggle-2d" style="font-size: 0.6rem; padding: 2px 6px;">2D TRACK</button>
-            </div>
-          </div>
-          <div style="font-family: var(--font-mono); font-size: 0.65rem; color: #64748b;">
-            Propagation: <span style="color: hsl(var(--color-cyan));" id="lbl-propagation-mode">satellite.js (SGP4)</span>
-          </div>
-        </div>
-        
-        <!-- Maps View Workspace -->
-        <div style="flex: 1; position: relative;">
-          <!-- Three.js Canvas Container -->
-          <div id="three-container" style="width:100%; height:100%; position:absolute; z-index: 2;"></div>
-          
-          <!-- Leaflet Map Container -->
-          <div id="leaflet-container" style="width:100%; height:100%; position:absolute; display:none; z-index: 1; background: #05050d;"></div>
-          
-          <!-- Orbit View Control Buttons overlay -->
-          <div class="orbit-controls-hud" style="z-index: 10;">
-            <button id="btn-camera-reset" class="hud-btn">
-              <i data-lucide="refresh-cw" style="width: 12px; height: 12px;"></i>
-              Reset Camera
-            </button>
-            <button id="btn-orbit-path-toggle" class="hud-btn active">
-              <i data-lucide="eye" style="width: 12px; height: 12px;"></i>
-              Orbits On
-            </button>
-            <button id="btn-debris-toggle" class="hud-btn active danger">
-              <i data-lucide="shield-alert" style="width: 12px; height: 12px;"></i>
-              Debris On
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <!-- Right Panel: Space Weather & Conjunction Alerts -->
-      <section class="hud-panel panel-collision" id="panel-alerts-weather">
-        <div class="panel-header">
-          <h2 class="panel-title">
-            <i data-lucide="sun" style="width: 16px; height: 16px;"></i>
-            Solar Weather & Conjunctions
-          </h2>
-        </div>
-        <div class="panel-content">
-          <!-- Aditya-L1 Sensor Metrics -->
-          <div class="metrics-grid">
-            <div class="metric-card">
-              <span class="metric-card-label">Aditya ASPEX</span>
-              <span class="metric-card-value" id="val-solar-wind">420 km/s</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-card-label">Aditya MAG (Z)</span>
-              <span class="metric-card-value" id="val-mag-flux">8.9 nT</span>
-            </div>
-          </div>
-          
-          <!-- Space Weather Canvas Graph -->
-          <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Aditya-L1 PAPA Proton Flux Chart</div>
-          <div class="weather-canvas-container">
-            <canvas id="weather-chart" style="width:100%; height:120px;"></canvas>
-          </div>
-          
-          <!-- Conjunction Risk Indicator -->
-          <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 15px; margin-bottom: 5px;">Conjunction Alert Matrix</div>
-          
-          <!-- Dynamic Conjunction Matrix Container -->
-          <div id="conjunction-list-container" style="display: flex; flex-direction: column; gap: 8px;">
-            <!-- Active conjunction alerts rendered dynamically -->
-          </div>
-        </div>
-      </section>
-
-      <!-- Bottom-Left Panel: Telemetry Console -->
-      <section class="hud-panel panel-terminal" id="panel-telemetry-console">
-        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
-          <div style="display: flex; gap: 15px; align-items: center;">
-            <h2 class="panel-title" id="tab-terminal-btn" style="cursor: pointer; opacity: 1; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s;">
-              <i data-lucide="terminal" style="width: 16px; height: 16px;"></i>
-              ISTRAC Uplink Console
-            </h2>
-            <h2 class="panel-title" id="tab-history-btn" style="cursor: pointer; opacity: 0.5; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s;">
-              <i data-lucide="history" style="width: 16px; height: 16px;"></i>
-              Maneuver History Log
-            </h2>
-            <h2 class="panel-title" id="tab-charts-btn" style="cursor: pointer; opacity: 0.5; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s;">
-              <i data-lucide="line-chart" style="width: 16px; height: 16px;"></i>
-              Subsystem Charts
-            </h2>
-            <h2 class="panel-title" id="tab-rca-btn" style="cursor: pointer; opacity: 0.5; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s;">
-              <i data-lucide="git-branch" style="width: 16px; height: 16px;"></i>
-              RCA Twin Analyzer
-            </h2>
-            <h2 class="panel-title" id="tab-integrations-btn" style="cursor: pointer; opacity: 0.5; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s;">
-              <i data-lucide="link-2" style="width: 16px; height: 16px;"></i>
-              Integrations
-            </h2>
-          </div>
-          <div style="font-family: var(--font-mono); font-size: 0.65rem; color: #64748b;">
-            Downlink Feed: <span style="color: hsl(var(--color-green));" id="lbl-ws-status">LOCAL OK</span>
-          </div>
-        </div>
-        <div class="panel-content" style="position: relative; display: flex; flex-direction: column; height: 100%;">
-          <!-- Terminal output scroll box -->
-          <div class="terminal-screen" id="terminal-screen-container" style="flex: 1; overflow-y: auto;">
-            <!-- Logging lines rendered dynamically -->
-          </div>
-          
-          <!-- Maneuver History Log Container -->
-          <div id="maneuver-history-container" style="display: none; flex: 1; overflow-y: auto; padding: 10px; font-family: var(--font-mono); font-size: 0.65rem; color: #e2e8f0; background: rgba(5, 7, 12, 0.4); border: 1px solid rgba(100, 116, 139, 0.2); border-radius: 4px; margin-bottom: 10px;">
-            <div style="text-align: center; color: #64748b; margin-top: 20px;">No orbital maneuvers recorded.</div>
-          </div>
-
-          <!-- Subsystem Charts Container -->
-          <div id="subsystem-charts-container" style="display: none; flex: 1; flex-direction: column; overflow: hidden; padding: 10px; font-family: var(--font-mono); background: rgba(5, 7, 12, 0.4); border: 1px solid rgba(100, 116, 139, 0.2); border-radius: 4px; margin-bottom: 10px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px;">
-              <div style="display: flex; gap: 8px; align-items: center;">
-                <span style="font-size: 0.65rem; color: #94a3b8;">ASSET:</span>
-                <select id="chart-sat-select" style="background: #0f172a; color: #e2e8f0; border: 1px solid rgba(100, 116, 139, 0.4); font-size: 0.65rem; padding: 2px 4px; border-radius: 3px; font-family: inherit; outline: none; cursor: pointer;">
-                  <option value="gaganyaan">Gaganyaan Crew Module</option>
-                  <option value="cartosat-3">Cartosat-3</option>
-                  <option value="navic-1i">NavIC-1I</option>
-                </select>
-              </div>
-              <div style="display: flex; gap: 8px; align-items: center;">
-                <span style="font-size: 0.65rem; color: #94a3b8;">METRIC:</span>
-                <select id="chart-metric-select" style="background: #0f172a; color: #e2e8f0; border: 1px solid rgba(100, 116, 139, 0.4); font-size: 0.65rem; padding: 2px 4px; border-radius: 3px; font-family: inherit; outline: none; cursor: pointer;">
-                  <option value="batterySoC">Battery State of Charge (%)</option>
-                  <option value="batteryTemp">Battery Temperature (°C)</option>
-                  <option value="altitude">Altitude (km)</option>
-                  <option value="downlinkSNR">Signal SNR (dB)</option>
-                </select>
               </div>
             </div>
-            <div style="flex: 1; position: relative; min-height: 100px;">
-              <canvas id="subsystem-history-chart" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
+          </div>
+        </section>
+
+        <!-- Center Panel: 3D/2D Map Canvas (Full screen backlayer) -->
+        <section class="hud-panel panel-orbits map-visualizer-panel" id="panel-orbital-tracker">
+          <div class="panel-header" style="background: rgba(0, 0, 0, 0.4); z-index: 10; position: absolute; top: 0; left: 0; right: 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <h2 class="panel-title" id="lbl-tracker-title" style="margin-left: 110px;">
+                <i data-lucide="globe"></i> 3D Space Domain Map
+              </h2>
+              <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.3); padding: 2px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05); flex-shrink: 0;">
+                <button class="panel-action active" id="btn-toggle-3d" style="font-size: 0.6rem; padding: 2px 6px;">3D GLOBE</button>
+                <button class="panel-action" id="btn-toggle-2d" style="font-size: 0.6rem; padding: 2px 6px;">2D TRACK</button>
+              </div>
+            </div>
+            <div class="propagation-lbl" style="font-family: var(--font-mono); font-size: 0.65rem; color: #64748b;">
+              Propagation: <span style="color: hsl(var(--color-cyan));" id="lbl-propagation-mode">satellite.js (SGP4)</span>
             </div>
           </div>
-
-          <!-- Subsystem RCA Container -->
-          <div id="subsystem-rca-container" style="display: none; flex: 1; flex-direction: column; overflow-y: auto; padding: 12px; font-family: var(--font-mono); background: rgba(5, 7, 12, 0.4); border: 1px solid rgba(100, 116, 139, 0.2); border-radius: 4px; margin-bottom: 10px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-              <div style="display: flex; gap: 8px; align-items: center;">
-                <span style="font-size: 0.65rem; color: #94a3b8;">DIAGNOSTIC TARGET:</span>
-                <select id="rca-sat-select" style="background: #0f172a; color: #e2e8f0; border: 1px solid rgba(100, 116, 139, 0.4); font-size: 0.65rem; padding: 2px 4px; border-radius: 3px; font-family: inherit; outline: none; cursor: pointer;">
-                  <option value="gaganyaan">Gaganyaan Crew Module</option>
-                  <option value="cartosat-3">Cartosat-3</option>
-                  <option value="navic-1i">NavIC-1I</option>
-                </select>
-              </div>
-              <button id="btn-trigger-rca" class="hud-btn" style="padding: 2px 8px; font-size: 0.6rem;">RUN ROOT CAUSE ANALYSIS</button>
+          
+          <!-- Maps View Workspace -->
+          <div style="flex: 1; position: relative; height: 100%;">
+            <!-- Three.js Canvas Container -->
+            <div id="three-container" style="width:100%; height:100%; position:absolute; z-index: 2;"></div>
+            
+            <!-- Leaflet Map Container -->
+            <div id="leaflet-container" style="width:100%; height:100%; position:absolute; display:none; z-index: 1; background: #05050d;"></div>
+            
+            <!-- Orbit View Control Buttons overlay -->
+            <div class="orbit-controls-hud" style="z-index: 10; bottom: 15px; left: 15px;">
+              <button id="btn-camera-reset" class="hud-btn" style="padding: 4px 8px; font-size: 0.65rem;">
+                <i data-lucide="refresh-cw" style="width: 12px; height: 12px;"></i> Reset Camera
+              </button>
+              <button id="btn-orbit-path-toggle" class="hud-btn active" style="padding: 4px 8px; font-size: 0.65rem;">
+                <i data-lucide="eye" style="width: 12px; height: 12px;"></i> Orbits On
+              </button>
+              <button id="btn-debris-toggle" class="hud-btn active danger" style="padding: 4px 8px; font-size: 0.65rem;">
+                <i data-lucide="shield-alert" style="width: 12px; height: 12px;"></i> Debris On
+              </button>
             </div>
-            <div id="rca-results-tree" style="flex: 1; font-size: 0.7rem; line-height: 1.4; color: #e2e8f0;">
+          </div>
+        </section>
+      </div>
+
+      <!-- View 2: Systems Telemetry Room -->
+      <div id="view-telemetry" class="dashboard-view">
+        <!-- Left: Command Console -->
+        <section class="hud-panel" id="panel-telemetry-console" style="display: flex; flex-direction: column;">
+          <div class="panel-header">
+            <h2 class="panel-title">
+              <i data-lucide="terminal"></i> ISTRAC Uplink Console
+            </h2>
+            <div style="font-family: var(--font-mono); font-size: 0.65rem; color: #64748b;">
+              Downlink Feed: <span style="color: hsl(var(--color-green));" id="lbl-ws-status">LOCAL OK</span>
+            </div>
+          </div>
+          <div class="panel-content" style="display: flex; flex-direction: column; height: 100%;">
+            <div class="terminal-screen" id="terminal-screen-container" style="flex: 1; overflow-y: auto; margin-bottom: 10px;">
+              <!-- Telemetry output lines -->
+            </div>
+            <div class="terminal-input-row" id="terminal-input-row-container">
+              <input type="text" class="terminal-input-box" id="inp-terminal-command" placeholder="Enter ISTRAC command (e.g. '/help', '/burn gaganyaan 1.5')..." />
+              <button id="btn-terminal-submit" class="hud-btn">UPLINK</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Right: Charts and Maneuver Logs stacked -->
+        <div class="telemetry-right-column">
+          <!-- Charts -->
+          <section class="hud-panel" style="flex: 1.2; display: flex; flex-direction: column;">
+            <div class="panel-header">
+              <h2 class="panel-title">
+                <i data-lucide="line-chart"></i> Subsystem Historical Charts
+              </h2>
+            </div>
+            <div class="panel-content" style="display: flex; flex-direction: column; overflow: hidden;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; flex-wrap: wrap;">
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <span style="font-size: 0.65rem; color: #94a3b8;">ASSET:</span>
+                  <select id="chart-sat-select" style="background: #0f172a; color: #e2e8f0; border: 1px solid rgba(100, 116, 139, 0.4); font-size: 0.65rem; padding: 2px 4px; border-radius: 3px; font-family: inherit; outline: none; cursor: pointer;">
+                    <option value="gaganyaan">Gaganyaan Crew Module</option>
+                    <option value="cartosat-3">Cartosat-3</option>
+                    <option value="navic-1i">NavIC-1I</option>
+                  </select>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <span style="font-size: 0.65rem; color: #94a3b8;">METRIC:</span>
+                  <select id="chart-metric-select" style="background: #0f172a; color: #e2e8f0; border: 1px solid rgba(100, 116, 139, 0.4); font-size: 0.65rem; padding: 2px 4px; border-radius: 3px; font-family: inherit; outline: none; cursor: pointer;">
+                    <option value="batterySoC">Battery State of Charge (%)</option>
+                    <option value="batteryTemp">Battery Temperature (°C)</option>
+                    <option value="altitude">Altitude (km)</option>
+                    <option value="downlinkSNR">Signal SNR (dB)</option>
+                  </select>
+                </div>
+              </div>
+              <div style="flex: 1; position: relative; min-height: 100px;">
+                <canvas id="subsystem-history-chart" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
+              </div>
+            </div>
+          </section>
+
+          <!-- Maneuver Logs -->
+          <section class="hud-panel" style="flex: 1; display: flex; flex-direction: column;">
+            <div class="panel-header">
+              <h2 class="panel-title">
+                <i data-lucide="history"></i> Maneuver Logs Registry
+              </h2>
+            </div>
+            <div class="panel-content" id="maneuver-history-container" style="overflow-y: auto;">
+              <div style="text-align: center; color: #64748b; margin-top: 20px;">No orbital maneuvers recorded.</div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- View 3: Space Weather & Diagnostics Room -->
+      <div id="view-diagnostics" class="dashboard-view">
+        <!-- Weather & Conjunction Panel -->
+        <section class="hud-panel panel-collision" id="panel-alerts-weather">
+          <div class="panel-header">
+            <h2 class="panel-title">
+              <i data-lucide="sun"></i> Solar Weather & Conjunction Alerts
+            </h2>
+          </div>
+          <div class="panel-content" style="overflow-y: auto;">
+            <div class="metrics-grid">
+              <div class="metric-card">
+                <span class="metric-card-label">Aditya ASPEX</span>
+                <span class="metric-card-value" id="val-solar-wind">420 km/s</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-card-label">Aditya MAG (Z)</span>
+                <span class="metric-card-value" id="val-mag-flux">8.9 nT</span>
+              </div>
+            </div>
+            
+            <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px;">Aditya-L1 PAPA Proton Flux Chart</div>
+            <div class="weather-canvas-container" style="margin-bottom: 15px;">
+              <canvas id="weather-chart" style="width:100%; height:120px;"></canvas>
+            </div>
+            
+            <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Conjunction Alert Matrix</div>
+            <div id="conjunction-list-container" style="display: flex; flex-direction: column; gap: 8px;">
+              <!-- Conjunction warnings -->
+            </div>
+          </div>
+        </section>
+
+        <!-- RCA Diagnostics -->
+        <section class="hud-panel" id="panel-rca-diagnostics" style="display: flex; flex-direction: column;">
+          <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 class="panel-title">
+              <i data-lucide="git-branch"></i> Subsystem RCA Twin Analyzer
+            </h2>
+            <button id="btn-trigger-rca" class="hud-btn" style="padding: 4px 10px; font-size: 0.65rem; border-radius: 2px;">RUN DIAGNOSTICS</button>
+          </div>
+          <div class="panel-content" style="display: flex; flex-direction: column;">
+            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+              <span style="font-size: 0.65rem; color: #94a3b8;">DIAGNOSTIC TARGET:</span>
+              <select id="rca-sat-select" style="background: #0f172a; color: #e2e8f0; border: 1px solid rgba(100, 116, 139, 0.4); font-size: 0.65rem; padding: 2px 4px; border-radius: 3px; font-family: inherit; outline: none; cursor: pointer;">
+                <option value="gaganyaan">Gaganyaan Crew Module</option>
+                <option value="cartosat-3">Cartosat-3</option>
+                <option value="navic-1i">NavIC-1I</option>
+              </select>
+            </div>
+            <div id="rca-results-tree" style="flex: 1; overflow-y: auto; font-size: 0.7rem; line-height: 1.4; color: #e2e8f0;">
               <div style="text-align: center; color: #64748b; margin-top: 20px;">Select a spacecraft and trigger analysis to diagnose active failure chains.</div>
             </div>
           </div>
+        </section>
+      </div>
 
-          <!-- Integrations Gateway Container -->
-          <div id="integration-manager-container" style="display: none; flex: 1; flex-direction: column; overflow-y: auto; padding: 12px; font-family: var(--font-mono); background: rgba(5, 7, 12, 0.4); border: 1px solid rgba(100, 116, 139, 0.2); border-radius: 4px; margin-bottom: 10px;">
-            <!-- Rendered by IntegrationManager component -->
-          </div>
-          
-          <!-- Input command field -->
-          <div class="terminal-input-row" id="terminal-input-row-container">
-            <input type="text" class="terminal-input-box" id="inp-terminal-command" placeholder="Enter ISTRAC telemetry command (e.g. '/diagnose', '/burn gaganyaan 1.25', '/clear_logs')..." />
-            <button id="btn-terminal-submit" class="hud-btn">UPLINK</button>
-          </div>
-        </div>
-      </section>
+      <!-- View 4: Gateway & AI Operations Room -->
+      <div id="view-gateway" class="dashboard-view">
+        <!-- Integrations manager console -->
+        <section class="hud-panel" id="integration-manager-container">
+          <!-- Webhooks form and active uplinks grid -->
+        </section>
 
-      <!-- Bottom-Right Panel: Gemini AI Agent -->
-      <section class="hud-panel panel-agent" id="panel-ai-operations">
-        <div class="panel-header">
-          <h2 class="panel-title ai">
-            <i data-lucide="sparkles" style="width: 16px; height: 16px; color: hsl(var(--color-purple));"></i>
-            Gemini Space AI Ops
-          </h2>
-        </div>
-        <div class="panel-content">
-          <!-- Gemini API Key configuration field -->
-          <div class="ai-key-input-row" id="container-api-key" style="margin-bottom: 8px;">
-            <i data-lucide="key" style="width: 12px; height: 12px; color: #64748b;"></i>
-            <input type="password" class="ai-key-input" id="inp-gemini-key" placeholder="Enter Gemini API Key for Live Agent loop..." />
-            <button id="btn-save-key" class="hud-btn" style="padding: 2px 8px; font-size: 0.6rem;">SAVE</button>
+        <!-- Gemini Chat interface -->
+        <section class="hud-panel panel-agent" id="panel-ai-operations" style="display: flex; flex-direction: column;">
+          <div class="panel-header">
+            <h2 class="panel-title ai">
+              <i data-lucide="sparkles" style="color: hsl(var(--color-purple));"></i> Gemini Space AI Ops
+            </h2>
           </div>
+          <div class="panel-content" style="display: flex; flex-direction: column; height: 100%;">
+            <div class="ai-key-input-row" id="container-api-key" style="margin-bottom: 10px;">
+              <i data-lucide="key" style="width: 12px; height: 12px; color: #64748b;"></i>
+              <input type="password" class="ai-key-input" id="inp-gemini-key" placeholder="Enter Gemini API Key for Live Agent loop..." />
+              <button id="btn-save-key" class="hud-btn" style="padding: 2px 8px; font-size: 0.6rem;">SAVE</button>
+            </div>
 
-          <div class="chat-history" id="chat-history-container">
-            <div class="chat-bubble ai">
-              <div class="chat-bubble-sender">
-                <i data-lucide="bot" style="width: 12px; height: 12px;"></i>
-                A.E.G.I.S. Space Intelligence
+            <div class="chat-history" id="chat-history-container" style="flex: 1; overflow-y: auto; margin-bottom: 10px;">
+              <div class="chat-bubble ai">
+                <div class="chat-bubble-sender">
+                  <i data-lucide="bot" style="width: 12px; height: 12px;"></i> A.E.G.I.S. Space Intelligence
+                </div>
+                NETRA Autonomous Operations online. Ready to monitor ISRO telemetry and coordinate maneuvers. Ask me to diagnose satellites or execute collision shield protocols.
               </div>
-              NETRA Autonomous Operations online. Ready to monitor ISRO telemetry and coordinate maneuvers. Ask me to diagnose satellites or execute collision shield protocols.
+            </div>
+            
+            <div class="terminal-input-row">
+              <input type="text" class="terminal-input-box" id="inp-chat-message" placeholder="Ask Gemini (e.g., 'Avoid collision')..." />
+              <button id="btn-chat-submit" class="hud-btn">SEND</button>
             </div>
           </div>
-          
-          <div class="terminal-input-row">
-            <input type="text" class="terminal-input-box" id="inp-chat-message" placeholder="Ask Gemini (e.g., 'Avoid collision')..." />
-            <button id="btn-chat-submit" class="hud-btn">SEND</button>
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
-      <!-- Floating Tool Execution Logs Overlay inside Gemini panel -->
+      <!-- Floating Tool Execution Logs Overlay -->
       <div style="display:none;" id="floating-agent-logs"></div>
 
     </main>
