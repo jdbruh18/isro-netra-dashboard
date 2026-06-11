@@ -12,6 +12,7 @@ import { initCollisionMonitor } from './components/collision-monitor.js';
 import { initGroundTrackMap, invalidateMapSize } from './components/ground-track.js';
 import { initSubsystemCharts } from './components/telemetry-charts.js';
 import { initRootCauseAnalyzer } from './components/root-cause-analyzer.js';
+import { initIntegrationManager } from './components/integration-manager.js';
 
 let socket = null;
 let useWebsocket = false;
@@ -93,6 +94,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initGroundTrackMap();
   initSubsystemCharts();
   initRootCauseAnalyzer();
+  initIntegrationManager();
 
   // 7.5. Bind Search and Filter Events
   bindSearchAndFilterEvents();

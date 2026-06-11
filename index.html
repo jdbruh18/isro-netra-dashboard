@@ -283,6 +283,10 @@
               <i data-lucide="git-branch" style="width: 16px; height: 16px;"></i>
               RCA Twin Analyzer
             </h2>
+            <h2 class="panel-title" id="tab-integrations-btn" style="cursor: pointer; opacity: 0.5; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s;">
+              <i data-lucide="link-2" style="width: 16px; height: 16px;"></i>
+              Integrations
+            </h2>
           </div>
           <div style="font-family: var(--font-mono); font-size: 0.65rem; color: #64748b;">
             Downlink Feed: <span style="color: hsl(var(--color-green));" id="lbl-ws-status">LOCAL OK</span>
@@ -341,6 +345,11 @@
             <div id="rca-results-tree" style="flex: 1; font-size: 0.7rem; line-height: 1.4; color: #e2e8f0;">
               <div style="text-align: center; color: #64748b; margin-top: 20px;">Select a spacecraft and trigger analysis to diagnose active failure chains.</div>
             </div>
+          </div>
+
+          <!-- Integrations Gateway Container -->
+          <div id="integration-manager-container" style="display: none; flex: 1; flex-direction: column; overflow-y: auto; padding: 12px; font-family: var(--font-mono); background: rgba(5, 7, 12, 0.4); border: 1px solid rgba(100, 116, 139, 0.2); border-radius: 4px; margin-bottom: 10px;">
+            <!-- Rendered by IntegrationManager component -->
           </div>
           
           <!-- Input command field -->

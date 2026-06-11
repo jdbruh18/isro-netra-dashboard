@@ -4,7 +4,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { initializeDb, getSatellites, saveSatellite, saveLog, saveAgentAction, saveTelemetryHistory, getTelemetryHistory } from './db.js';
+import { initializeDb, getSatellites, saveSatellite, saveLog, saveAgentAction, saveTelemetryHistory, getTelemetryHistory, getWebhooks, saveWebhook, deleteWebhook } from './db.js';
 import { validateBurn } from './src/core/avoidance-proof.js';
 import { validatePowerState, validateThrusterFuel, validateADCSState } from './src/core/subsystem-safety-proof.js';
 import { SemanticKnowledgeGraph } from './src/core/knowledge-graph.js';
@@ -763,6 +763,44 @@ function broadcastTelemetry(type, data) {
   });
 }
 
+// Webhook state tracking
+const lastThreatLevels = new Map();
+const lastActiveAnomalies = new Map();
+let lastStormState = false;
+
+// Helper: Dispatch event payloads to registered webhooks
+async function triggerWebhooks(eventType, payload) {
+  try {
+    const webhooks = await getWebhooks();
+    const activeTargets = webhooks.filter(w => w.events.includes(eventType) || w.events.includes('*'));
+
+    for (const target of activeTargets) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2-second timeout
+        const response = await fetch(target.url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event: eventType,
+            timestamp: new Date().toISOString(),
+            payload: payload
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (!response.ok) {
+          console.error(`[Webhook-Error] Target ${target.name} (${target.url}) returned status ${response.status}`);
+        }
+      } catch (err) {
+        console.error(`[Webhook-Error] Failed to dispatch payload to ${target.name} (${target.url}): ${err.message}`);
+      }
+    }
+  } catch (err) {
+    console.error("Failed to run triggerWebhooks loop:", err);
+  }
+}
+
 // Modify satellite altitude based on delta-v (orbital thrust mechanics simulation)
 async function executeManeuver(satId, deltaV, direction, source = "Manual Control") {
   const sat = serverTelemetry.satellites.find(s => s.id === satId);
@@ -848,6 +886,18 @@ async function executeManeuver(satId, deltaV, direction, source = "Manual Contro
   } catch (err) {
     console.error("Database save failed inside executeManeuver:", err);
   }
+
+  // Trigger outbound Webhooks
+  triggerWebhooks('MANEUVER_EXECUTED', {
+    satelliteId: satId,
+    satelliteName: sat.name,
+    deltaV: parsedDeltaV,
+    direction: direction,
+    newAlt: sat.alt,
+    altShift: altShift,
+    source: source,
+    details: details
+  }).catch(err => console.error("Error triggering maneuver webhook:", err));
 
   // Broadcast update to all listeners
   broadcastTelemetry("ORBIT_MODIFIED", {
@@ -1028,6 +1078,202 @@ app.post('/api/catalog/add', async (req, res) => {
   }
 });
 
+// Unified Tool Executor for Gemini AI Agent and MCP Web SSE Server
+async function runMCPTool(name, args, apiKey = null) {
+  let toolResult = {};
+  if (name === "get_satellite_states") {
+    toolResult = { satellites: serverTelemetry.satellites };
+  } else if (name === "get_space_weather") {
+    toolResult = { spaceWeather: serverTelemetry.spaceWeather };
+  } else if (name === "get_anomaly_diagnostics") {
+    const diagnostics = serverTelemetry.satellites.map(s => ({
+      id: s.id,
+      name: s.name,
+      orbit: s.orbit || {},
+      thermal: s.thermal || {},
+      power: s.power || {},
+      communications: s.communications || {},
+      radiation: s.radiation || {},
+      propulsion: s.propulsion || {}
+    }));
+    toolResult = { diagnostics };
+  } else if (name === "get_active_conjunctions") {
+    const activeSats = serverTelemetry.satellites.filter(s => s.category !== 'debris');
+    const debrisSats = serverTelemetry.satellites.filter(s => s.category === 'debris');
+    const conjunctions = [];
+    activeSats.forEach(activeSat => {
+      debrisSats.forEach(debrisSat => {
+        const rad = (Math.PI / 180);
+        const earthRadius = 6378.137;
+        const lat1 = (activeSat.lat || 0) * rad;
+        const lng1 = (activeSat.lng || 0) * rad;
+        const r1 = earthRadius + (activeSat.alt || 0);
+        const x1 = r1 * Math.cos(lat1) * Math.cos(lng1);
+        const y1 = r1 * Math.cos(lat1) * Math.sin(lng1);
+        const z1 = r1 * Math.sin(lat1);
+        const lat2 = (debrisSat.lat || 0) * rad;
+        const lng2 = (debrisSat.lng || 0) * rad;
+        const r2 = earthRadius + (debrisSat.alt || 0);
+        const x2 = r2 * Math.cos(lat2) * Math.cos(lng2);
+        const y2 = r2 * Math.cos(lat2) * Math.sin(lng2);
+        const z2 = r2 * Math.sin(lat2);
+        const dx = x1 - x2;
+        const dy = y1 - y2;
+        const dz = z1 - z2;
+        const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        if (dist < 350) {
+          conjunctions.push({
+            activeId: activeSat.id,
+            activeName: activeSat.name,
+            debrisId: debrisSat.id,
+            debrisName: debrisSat.name,
+            distanceKm: dist,
+            probability: 100 * Math.exp(-dist / 120),
+            dangerLevel: dist < 150 ? 'DANGER' : 'WARNING'
+          });
+        }
+      });
+    });
+    toolResult = { conjunctions };
+  } else if (name === "consult_solar_physics_analyst") {
+    const weather = serverTelemetry.spaceWeather;
+    let analystResult = null;
+    if (apiKey) {
+      try {
+        const analystAi = new GoogleGenerativeAI(apiKey);
+        const analystModel = analystAi.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `You are the Aditya Solar Physics Analyst at ISRO.
+Review the following solar weather data from the Aditya-L1 observatory:
+- Kp Index: ${weather.kpIndex}
+- Solar Wind Speed: ${weather.solarWindSpeed} km/s
+- Solar Proton Flux: ${weather.solarProtonFlux} pfu
+- Magnetic Storm Level: ${weather.magneticStormLevel}
+
+Determine if it is safe to execute an orbital maneuver.
+Criteria: If Solar Proton Flux is > 15.0 pfu or Kp Index >= 4.5, you MUST recommend AGAINST orbital maneuvers due to high risk of thruster electrostatic discharge (ESD) and telemetry scintillation/blackout.
+Otherwise, recommend proceeding.
+Return your response strictly in the following JSON format:
+{
+  "status": "CLEAR" or "ABORT",
+  "reasoning": "Scientific reasoning regarding radiation levels and thruster risks",
+  "recommendation": "Operational recommendation statement"
+}`;
+        const apiRes = await analystModel.generateContent({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: "application/json" }
+        });
+        analystResult = JSON.parse(apiRes.response.text());
+      } catch (apiErr) {
+        console.warn("Secondary Aditya agent API call failed, falling back to rule-based evaluation:", apiErr);
+      }
+    }
+    if (!analystResult || !analystResult.status) {
+      const isStorm = weather.solarProtonFlux > 15.0 || weather.kpIndex >= 4.5;
+      analystResult = {
+        status: isStorm ? "ABORT" : "CLEAR",
+        reasoning: isStorm
+          ? `Proton flux (${weather.solarProtonFlux.toFixed(1)} pfu) or Kp index (${weather.kpIndex.toFixed(1)}) is above safety thresholds. Ionizing radiation hazard and communication interference active.`
+          : `Proton flux (${weather.solarProtonFlux.toFixed(1)} pfu) is stable. Space weather environment clear.`,
+        recommendation: isStorm
+          ? "ABORT burn sequence. Defer orbital corrections and initiate spacecraft electrostatic shielding."
+          : "Proceed with maneuver. Systems clear."
+      };
+    }
+    toolResult = {
+      satelliteId: args.satelliteId,
+      status: analystResult.status,
+      reasoning: analystResult.reasoning,
+      recommendation: analystResult.recommendation,
+      solarProtonFlux: weather.solarProtonFlux,
+      kpIndex: weather.kpIndex
+    };
+  } else if (name === "calculate_avoidance_vector") {
+    const satId = args.satelliteId;
+    const sat = serverTelemetry.satellites.find(s => s.id === satId);
+    const debris = serverTelemetry.satellites.find(s => s.category === 'debris') || { alt: 405.41 };
+    
+    const dv = satId === 'navic-1i' ? 0.85 : 1.45;
+    const dirStr = "PROGRADE";
+    const safetyMargin = 2.0; // 2 km safety clearance
+    
+    const validation = validateBurn(
+      satId,
+      dv,
+      dirStr,
+      sat ? sat.alt : 405.23,
+      debris.alt,
+      safetyMargin,
+      sat && sat.thermal ? sat.thermal.thermalStress : 0.0,
+      sat && sat.radiation ? sat.radiation.seuProbability : 0.0
+    );
+
+    if (validation.success) {
+      toolResult = {
+        satelliteId: satId,
+        recommendedDeltaV: dv,
+        recommendedDirection: dirStr,
+        estimatedOrbitalShiftKm: validation.data.expectedAltitudeShift,
+        newAltitudeKm: validation.data.newAltitude,
+        validationProof: "Idris 2 type-level verification: SUCCESS. Burn magnitude and safety margin certified."
+      };
+    } else {
+      toolResult = {
+        satelliteId: satId,
+        error: validation.error,
+        validationProof: "Idris 2 type-level verification: FAIL. " + validation.error
+      };
+    }
+  } else if (name === "get_predictive_diagnostics") {
+    const satId = args.satelliteId;
+    const sat = serverTelemetry.satellites.find(s => s.id === satId);
+    if (sat) {
+      toolResult = {
+        satelliteId: satId,
+        activeAnomalies: sat.anomalies ? sat.anomalies.activeList : [],
+        predictions: sat.anomalies ? sat.anomalies.predictions : {}
+      };
+    } else {
+      toolResult = { error: `Space asset ID "${satId}" not found in tracking catalog.` };
+    }
+  } else if (name === "validate_subsystem_state") {
+    const satId = args.satelliteId;
+    const driftRate = args.driftRate || 0.1;
+    const sat = serverTelemetry.satellites.find(s => s.id === satId);
+    if (sat) {
+      const powerVal = validatePowerState(satId, sat.power ? sat.power.batterySoC : 100.0);
+      const fuelVal = validateThrusterFuel(
+        satId,
+        0.0,
+        sat.propulsion ? sat.propulsion.propellantMassKg : 400.0,
+        sat.propulsion ? sat.propulsion.fuelPressurePsi : 220.0
+      );
+      const adcsVal = validateADCSState(satId, driftRate);
+
+      toolResult = {
+        satelliteId: satId,
+        powerVerification: powerVal.success ? "SUCCESS" : "FAIL: " + powerVal.error,
+        propulsionVerification: fuelVal.success ? "SUCCESS" : "FAIL: " + fuelVal.error,
+        adcsVerification: adcsVal.success ? "SUCCESS" : "FAIL: " + adcsVal.error,
+        proofStatus: "Idris 2 Subsystem Verification Run Complete."
+      };
+    } else {
+      toolResult = { error: `Space asset ID "${satId}" not found in tracking catalog.` };
+    }
+  } else if (name === "execute_orbital_burn") {
+    const { satelliteId, deltaV, direction } = args;
+    toolResult = await executeManeuver(satelliteId, deltaV, direction, `Gemini Agentic Command`);
+  } else if (name === "get_root_cause_analysis") {
+    const satId = args.satelliteId;
+    const sat = serverTelemetry.satellites.find(s => s.id === satId);
+    if (sat) {
+      toolResult = graph.analyzeRootCause(sat, serverTelemetry.spaceWeather);
+    } else {
+      toolResult = { error: `Space asset ID "${satId}" not found in tracking catalog.` };
+    }
+  }
+  return toolResult;
+}
+
 // REST Endpoint: Gemini AI Agent Gateway with Function Calling (Tools)
 app.post('/api/gemini', async (req, res) => {
   // Use env key or client header key for ultimate flexibility (hybrid local/cloud mode)
@@ -1183,207 +1429,7 @@ Format your final response in clear, concise markdown with appropriate headers. 
         let toolResult = {};
 
         // Execute the tool and capture output
-        if (name === "get_satellite_states") {
-          toolResult = { satellites: serverTelemetry.satellites };
-        } else if (name === "get_space_weather") {
-          toolResult = { spaceWeather: serverTelemetry.spaceWeather };
-        } else if (name === "get_anomaly_diagnostics") {
-          const diagnostics = serverTelemetry.satellites.map(s => ({
-            id: s.id,
-            name: s.name,
-            orbit: s.orbit || {},
-            thermal: s.thermal || {},
-            power: s.power || {},
-            communications: s.communications || {},
-            radiation: s.radiation || {},
-            propulsion: s.propulsion || {}
-          }));
-          toolResult = { diagnostics };
-        } else if (name === "get_active_conjunctions") {
-          const activeSats = serverTelemetry.satellites.filter(s => s.category !== 'debris');
-          const debrisSats = serverTelemetry.satellites.filter(s => s.category === 'debris');
-          const conjunctions = [];
-          
-          activeSats.forEach(activeSat => {
-            debrisSats.forEach(debrisSat => {
-              const rad = (Math.PI / 180);
-              const earthRadius = 6378.137;
-              
-              const lat1 = (activeSat.lat || 0) * rad;
-              const lng1 = (activeSat.lng || 0) * rad;
-              const r1 = earthRadius + (activeSat.alt || 0);
-              const x1 = r1 * Math.cos(lat1) * Math.cos(lng1);
-              const y1 = r1 * Math.cos(lat1) * Math.sin(lng1);
-              const z1 = r1 * Math.sin(lat1);
-
-              const lat2 = (debrisSat.lat || 0) * rad;
-              const lng2 = (debrisSat.lng || 0) * rad;
-              const r2 = earthRadius + (debrisSat.alt || 0);
-              const x2 = r2 * Math.cos(lat2) * Math.cos(lng2);
-              const y2 = r2 * Math.cos(lat2) * Math.sin(lng2);
-              const z2 = r2 * Math.sin(lat2);
-
-              const dx = x1 - x2;
-              const dy = y1 - y2;
-              const dz = z1 - z2;
-              const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-              
-              if (dist < 350) {
-                conjunctions.push({
-                  activeId: activeSat.id,
-                  activeName: activeSat.name,
-                  debrisId: debrisSat.id,
-                  debrisName: debrisSat.name,
-                  distanceKm: dist,
-                  probability: 100 * Math.exp(-dist / 120),
-                  dangerLevel: dist < 150 ? 'DANGER' : 'WARNING'
-                });
-              }
-            });
-          });
-          toolResult = { conjunctions };
-        } else if (name === "consult_solar_physics_analyst") {
-          const weather = serverTelemetry.spaceWeather;
-          let analystResult = null;
-          
-          try {
-            // Secondary agent invocation
-            const analystAi = new GoogleGenerativeAI(apiKey);
-            const analystModel = analystAi.getGenerativeModel({ model: "gemini-1.5-flash" });
-            const prompt = `You are the Aditya Solar Physics Analyst at ISRO.
-Review the following solar weather data from the Aditya-L1 observatory:
-- Kp Index: ${weather.kpIndex}
-- Solar Wind Speed: ${weather.solarWindSpeed} km/s
-- Solar Proton Flux: ${weather.solarProtonFlux} pfu
-- Magnetic Storm Level: ${weather.magneticStormLevel}
-
-Determine if it is safe to execute an orbital maneuver.
-Criteria: If Solar Proton Flux is > 15.0 pfu or Kp Index >= 4.5, you MUST recommend AGAINST orbital maneuvers due to high risk of thruster electrostatic discharge (ESD) and telemetry scintillation/blackout.
-Otherwise, recommend proceeding.
-Return your response strictly in the following JSON format:
-{
-  "status": "CLEAR" or "ABORT",
-  "reasoning": "Scientific reasoning regarding radiation levels and thruster risks",
-  "recommendation": "Operational recommendation statement"
-}`;
-            const apiRes = await analystModel.generateContent({
-              contents: [{ role: "user", parts: [{ text: prompt }] }],
-              generationConfig: { responseMimeType: "application/json" }
-            });
-            const textResponse = apiRes.response.text();
-            analystResult = JSON.parse(textResponse);
-          } catch (apiErr) {
-            console.warn("Secondary Aditya agent API call failed, falling back to rule-based evaluation:", apiErr);
-          }
-
-          // Fallback rule if API call failed or returned malformed json
-          if (!analystResult || !analystResult.status) {
-            const isStorm = weather.solarProtonFlux > 15.0 || weather.kpIndex >= 4.5;
-            analystResult = {
-              status: isStorm ? "ABORT" : "CLEAR",
-              reasoning: isStorm
-                ? `Proton flux (${weather.solarProtonFlux.toFixed(1)} pfu) or Kp index (${weather.kpIndex.toFixed(1)}) is above safety thresholds. Ionizing radiation hazard and communication interference active.`
-                : `Proton flux (${weather.solarProtonFlux.toFixed(1)} pfu) is stable. Space weather environment clear.`,
-              recommendation: isStorm
-                ? "ABORT burn sequence. Defer orbital corrections and initiate spacecraft electrostatic shielding."
-                : "Proceed with maneuver. Systems clear."
-            };
-          }
-
-          toolResult = {
-            satelliteId: args.satelliteId,
-            status: analystResult.status,
-            reasoning: analystResult.reasoning,
-            recommendation: analystResult.recommendation,
-            solarProtonFlux: weather.solarProtonFlux,
-            kpIndex: weather.kpIndex
-          };
-        } else if (name === "calculate_avoidance_vector") {
-          const satId = args.satelliteId;
-          const sat = serverTelemetry.satellites.find(s => s.id === satId);
-          const debris = serverTelemetry.satellites.find(s => s.category === 'debris') || { alt: 405.41 };
-          
-          const dv = satId === 'navic-1i' ? 0.85 : 1.45;
-          const dirStr = "PROGRADE";
-          const safetyMargin = 2.0; // 2 km safety clearance
-          
-          // Call compiled Idris 2 validator
-          const validation = validateBurn(
-            satId,
-            dv,
-            dirStr,
-            sat ? sat.alt : 405.23,
-            debris.alt,
-            safetyMargin,
-            sat && sat.thermal ? sat.thermal.thermalStress : 0.0,
-            sat && sat.radiation ? sat.radiation.seuProbability : 0.0
-          );
-
-          if (validation.success) {
-            toolResult = {
-              satelliteId: satId,
-              recommendedDeltaV: dv,
-              recommendedDirection: dirStr,
-              estimatedOrbitalShiftKm: validation.data.expectedAltitudeShift,
-              newAltitudeKm: validation.data.newAltitude,
-              validationProof: "Idris 2 type-level verification: SUCCESS. Burn magnitude and safety margin certified."
-            };
-          } else {
-            toolResult = {
-              satelliteId: satId,
-              error: validation.error,
-              validationProof: "Idris 2 type-level verification: FAIL. " + validation.error
-            };
-          }
-        } else if (name === "get_predictive_diagnostics") {
-          const satId = args.satelliteId;
-          const sat = serverTelemetry.satellites.find(s => s.id === satId);
-          if (sat) {
-            toolResult = {
-              satelliteId: satId,
-              activeAnomalies: sat.anomalies ? sat.anomalies.activeList : [],
-              predictions: sat.anomalies ? sat.anomalies.predictions : {}
-            };
-          } else {
-            toolResult = { error: `Space asset ID "${satId}" not found in tracking catalog.` };
-          }
-        } else if (name === "validate_subsystem_state") {
-          const satId = args.satelliteId;
-          const driftRate = args.driftRate || 0.1;
-          const sat = serverTelemetry.satellites.find(s => s.id === satId);
-          if (sat) {
-            const powerVal = validatePowerState(satId, sat.power ? sat.power.batterySoC : 100.0);
-            const fuelVal = validateThrusterFuel(
-              satId,
-              0.0,
-              sat.propulsion ? sat.propulsion.propellantMassKg : 400.0,
-              sat.propulsion ? sat.propulsion.fuelPressurePsi : 220.0
-            );
-            const adcsVal = validateADCSState(satId, driftRate);
-
-            toolResult = {
-              satelliteId: satId,
-              powerVerification: powerVal.success ? "SUCCESS" : "FAIL: " + powerVal.error,
-              propulsionVerification: fuelVal.success ? "SUCCESS" : "FAIL: " + fuelVal.error,
-              adcsVerification: adcsVal.success ? "SUCCESS" : "FAIL: " + adcsVal.error,
-              proofStatus: "Idris 2 Subsystem Verification Run Complete."
-            };
-          } else {
-            toolResult = { error: `Space asset ID "${satId}" not found in tracking catalog.` };
-          }
-        } else if (name === "execute_orbital_burn") {
-          const { satelliteId, deltaV, direction } = args;
-          const result = await executeManeuver(satelliteId, deltaV, direction, `Gemini Agentic Command (${model.model})`);
-          toolResult = result;
-        } else if (name === "get_root_cause_analysis") {
-          const satId = args.satelliteId;
-          const sat = serverTelemetry.satellites.find(s => s.id === satId);
-          if (sat) {
-            toolResult = graph.analyzeRootCause(sat, serverTelemetry.spaceWeather);
-          } else {
-            toolResult = { error: `Space asset ID "${satId}" not found in tracking catalog.` };
-          }
-        }
+        toolResult = await runMCPTool(name, args, apiKey);
 
         executionLogs.push({
           tool: name,
@@ -1429,10 +1475,243 @@ Return your response strictly in the following JSON format:
   }
 });
 
+// Expose tools and active session mappings for MCP Web SSE Server
+const mcpSessions = new Map();
+
+// HTTP GET: Establishes Server-Sent Events (SSE) stream for Web MCP tool-calling
+app.get('/api/mcp/sse', (req, res) => {
+  const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+  
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive'
+  });
+  
+  // Send the message endpoint target back to the client immediately
+  res.write(`event: endpoint\ndata: /api/mcp/message?id=${sessionId}\n\n`);
+  mcpSessions.set(sessionId, res);
+  
+  req.on('close', () => {
+    mcpSessions.delete(sessionId);
+  });
+});
+
+// HTTP POST: Receives JSON-RPC command payloads from remote clients and handles execution
+app.post('/api/mcp/message', async (req, res) => {
+  const sessionId = req.query.id;
+  const clientRes = mcpSessions.get(sessionId);
+  if (!clientRes) {
+    return res.status(404).json({ error: "Active MCP SSE session not found." });
+  }
+
+  const request = req.body;
+  const { jsonrpc, id, method, params } = request;
+
+  if (jsonrpc !== '2.0') {
+    return res.status(400).json({ error: "Invalid JSON-RPC version." });
+  }
+
+  let rpcResponse = { jsonrpc: '2.0', id };
+
+  try {
+    if (method === 'initialize') {
+      rpcResponse.result = {
+        protocolVersion: '2024-11-05',
+        capabilities: { tools: {} },
+        serverInfo: { name: 'isro-netra-web-mcp', version: '1.0.0' }
+      };
+    } else if (method === 'tools/list') {
+      rpcResponse.result = {
+        tools: [
+          {
+            name: 'get_space_assets',
+            description: 'Retrieve all tracked spacecraft and debris with coordinates, threat levels, and digital twin subsystem states.',
+            inputSchema: { type: 'object', properties: {} }
+          },
+          {
+            name: 'get_space_weather',
+            description: 'Retrieve real-time solar wind speed, proton flux, Kp-index, and magnetic field readings from Aditya-L1 payloads.',
+            inputSchema: { type: 'object', properties: {} }
+          },
+          {
+            name: 'get_anomaly_diagnostics',
+            description: 'Retrieve active subsystem anomalies and failure-prediction margins.',
+            inputSchema: { type: 'object', properties: {} }
+          },
+          {
+            name: 'get_root_cause_analysis',
+            description: 'Retrieve directed causality trees diagnosing active subsystem failures.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                satelliteId: { type: 'string', description: 'Unique ID of the satellite (e.g. "gaganyaan").' }
+              },
+              required: ['satelliteId']
+            }
+          },
+          {
+            name: 'consult_solar_physics_analyst',
+            description: 'Consult solar physics team to check radiation and geomagnetic safety parameters before burns.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                satelliteId: { type: 'string', description: 'Unique ID of the satellite.' }
+              },
+              required: ['satelliteId']
+            }
+          },
+          {
+            name: 'validate_subsystem_state',
+            description: 'Verify spacecraft power state, thruster fuel, lines pressure, and ADCS drift prior to burns.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                satelliteId: { type: 'string', description: 'Unique ID of the satellite.' },
+                driftRate: { type: 'number', description: 'ADCS attitude drift rate in deg/s.' }
+              },
+              required: ['satelliteId']
+            }
+          },
+          {
+            name: 'calculate_avoidance_vector',
+            description: 'Calculate orbital safety evasion parameters required to clear debris.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                satelliteId: { type: 'string', description: 'Unique ID of the satellite.' }
+              },
+              required: ['satelliteId']
+            }
+          },
+          {
+            name: 'execute_orbital_burn',
+            description: 'Fire thrusters on a spacecraft to adjust altitude, subject to safety bounds and debris clearance.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                satelliteId: { type: 'string', description: 'Unique ID of the satellite.' },
+                deltaV: { type: 'number', description: 'Thrust vector magnitude in m/s.' },
+                direction: { type: 'string', enum: ['PROGRADE', 'RETROGRADE'], description: 'Burn direction.' }
+              },
+              required: ['satelliteId', 'deltaV', 'direction']
+            }
+          }
+        ]
+      };
+    } else if (method === 'tools/call') {
+      const { name, arguments: args } = params;
+      const apiKey = process.env.GEMINI_API_KEY;
+      const toolResult = await runMCPTool(name, args, apiKey);
+      rpcResponse.result = {
+        content: [{ type: 'text', text: JSON.stringify(toolResult, null, 2) }],
+        isError: false
+      };
+    } else {
+      rpcResponse.error = { code: -32601, message: `Method "${method}" not found.` };
+    }
+  } catch (err) {
+    rpcResponse.result = {
+      content: [{ type: 'text', text: `Tool call failed: ${err.message}` }],
+      isError: true
+    };
+  }
+
+  // Send response back over SSE event-stream channel
+  clientRes.write(`event: message\ndata: ${JSON.stringify(rpcResponse)}\n\n`);
+  res.json({ success: true });
+});
+
+// REST Endpoints: Manage Outbound Webhooks (Tentacles Out)
+app.get('/api/webhooks', async (req, res) => {
+  try {
+    const list = await getWebhooks();
+    res.json(list);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load webhooks: " + err.message });
+  }
+});
+
+app.post('/api/webhooks', async (req, res) => {
+  const { id, name, url, events } = req.body;
+  if (!url) {
+    return res.status(400).json({ error: "Missing webhook target url." });
+  }
+  try {
+    const saved = await saveWebhook({ id, name, url, events });
+    res.json(saved);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to save webhook: " + err.message });
+  }
+});
+
+app.delete('/api/webhooks/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await deleteWebhook(id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete webhook: " + err.message });
+  }
+});
+
+app.post('/api/webhooks/test', async (req, res) => {
+  const { url } = req.body;
+  if (!url) {
+    return res.status(400).json({ error: "Missing test url." });
+  }
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'TEST_CONNECTION',
+        timestamp: new Date().toISOString(),
+        payload: { message: "ISRO NETRA Integration Gateway connection test: SUCCESS." }
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (response.ok) {
+      res.json({ success: true, message: "Mock payload transmitted. Target returned " + response.status });
+    } else {
+      res.status(400).json({ error: "Target returned error status " + response.status });
+    }
+  } catch (err) {
+    res.status(400).json({ error: "Target unreachable: " + err.message });
+  }
+});
+
 // Host and update real-time telemetry coordinates internally every 1s
 setInterval(() => {
   const weather = serverTelemetry.spaceWeather;
   const isStorm = weather.solarProtonFlux > 15.0 || weather.kpIndex >= 4.5;
+
+  // Space weather storm transition webhooks
+  if (isStorm !== lastStormState) {
+    if (isStorm) {
+      triggerWebhooks('SOLAR_STORM_ALERT', {
+        active: true,
+        solarProtonFlux: weather.solarProtonFlux,
+        kpIndex: weather.kpIndex,
+        solarWindSpeed: weather.solarWindSpeed,
+        magneticStormLevel: weather.magneticStormLevel,
+        details: `Solar storm detected! Proton flux: ${weather.solarProtonFlux.toFixed(1)} pfu, Kp Index: ${weather.kpIndex.toFixed(1)}.`
+      }).catch(err => console.error("Error triggering solar storm alert webhook:", err));
+    } else {
+      triggerWebhooks('SOLAR_STORM_ALERT', {
+        active: false,
+        solarProtonFlux: weather.solarProtonFlux,
+        kpIndex: weather.kpIndex,
+        solarWindSpeed: weather.solarWindSpeed,
+        magneticStormLevel: weather.magneticStormLevel,
+        details: "Solar storm cleared. Space weather environment has returned to normal."
+      }).catch(err => console.error("Error triggering solar storm clear webhook:", err));
+    }
+    lastStormState = isStorm;
+  }
 
   serverTelemetry.satellites.forEach(s => {
     // 1. Initialize nested subsystem states if missing (catalog additions)
@@ -1696,6 +1975,33 @@ setInterval(() => {
     s.alt = s.orbit.alt;
     s.velocity = s.orbit.velocity;
 
+    // Check subsystem anomaly transitions
+    const prevAnomalies = lastActiveAnomalies.get(s.id) || [];
+    const currentAnomalies = s.anomalies ? (s.anomalies.activeList || []) : [];
+    
+    const triggeredAnoms = currentAnomalies.filter(a => !prevAnomalies.includes(a));
+    const clearedAnoms = prevAnomalies.filter(a => !currentAnomalies.includes(a));
+    
+    triggeredAnoms.forEach(anomaly => {
+      triggerWebhooks('ANOMALY_TRIGGERED', {
+        satelliteId: s.id,
+        satelliteName: s.name,
+        anomaly: anomaly,
+        timestamp: new Date().toISOString()
+      }).catch(err => console.error("Error triggering anomaly triggered webhook:", err));
+    });
+    
+    clearedAnoms.forEach(anomaly => {
+      triggerWebhooks('ANOMALY_CLEARED', {
+        satelliteId: s.id,
+        satelliteName: s.name,
+        anomaly: anomaly,
+        timestamp: new Date().toISOString()
+      }).catch(err => console.error("Error triggering anomaly cleared webhook:", err));
+    });
+    
+    lastActiveAnomalies.set(s.id, currentAnomalies);
+
     // Save history point to rolling local memory buffer
     const historyPoint = {
       timestamp: new Date().toISOString(),
@@ -1763,6 +2069,32 @@ setInterval(() => {
         debrisSat.threatDetails = `Intersection route with ${activeSat.name}. Distance: ${dist.toFixed(1)} km.`;
       }
     });
+  });
+
+  // Check conjunction threat level transitions
+  serverTelemetry.satellites.forEach(s => {
+    const prevThreat = lastThreatLevels.get(s.id) || "NORMAL";
+    const currentThreat = s.threatLevel || "NORMAL";
+    if (prevThreat !== currentThreat) {
+      if (currentThreat === "WARNING" || currentThreat === "DANGER") {
+        triggerWebhooks('CONJUNCTION_WARNING', {
+          satelliteId: s.id,
+          satelliteName: s.name,
+          threatLevel: currentThreat,
+          details: s.threatDetails,
+          timestamp: new Date().toISOString()
+        }).catch(err => console.error("Error triggering conjunction warning webhook:", err));
+      } else if (prevThreat === "WARNING" || prevThreat === "DANGER") {
+        triggerWebhooks('CONJUNCTION_CLEARED', {
+          satelliteId: s.id,
+          satelliteName: s.name,
+          threatLevel: currentThreat,
+          details: "Collision risk resolved/cleared.",
+          timestamp: new Date().toISOString()
+        }).catch(err => console.error("Error triggering conjunction cleared webhook:", err));
+      }
+      lastThreatLevels.set(s.id, currentThreat);
+    }
   });
   
   // Tick weather parameters inside server memory (only drift if storm override active)

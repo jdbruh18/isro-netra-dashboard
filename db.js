@@ -626,9 +626,10 @@ function readLocalJson() {
     }
     if (!data.telemetryLogs) data.telemetryLogs = [];
     if (!data.agentActions) data.agentActions = [];
+    if (!data.webhooks) data.webhooks = [];
     return data;
   } catch (e) {
-    return { satellites: [...DEFAULT_SATELLITES], telemetryLogs: [], agentActions: [] };
+    return { satellites: [...DEFAULT_SATELLITES], telemetryLogs: [], agentActions: [], webhooks: [] };
   }
 }
 
@@ -684,7 +685,8 @@ export async function initializeDb() {
       telemetryLogs: [
         { timestamp: new Date().toLocaleTimeString(), text: "Local database seeded successfully.", type: "success" }
       ],
-      agentActions: []
+      agentActions: [],
+      webhooks: []
     };
     fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(initialData, null, 2), 'utf-8');
   }
@@ -735,6 +737,16 @@ export async function initializePostgresSchema() {
         timestamp VARCHAR(50) NOT NULL,
         action_details JSONB NOT NULL,
         timestamp_ms BIGINT NOT NULL
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS webhooks (
+        id VARCHAR(50) PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        url TEXT NOT NULL,
+        events JSONB NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -1036,3 +1048,124 @@ export async function getTelemetryHistory(satId, limitVal = 50) {
   }
   return [];
 }
+
+export async function getWebhooks() {
+  if (usePostgres && pgPool) {
+    try {
+      const res = await pgPool.query('SELECT * FROM webhooks ORDER BY created_at DESC');
+      return res.rows.map(r => ({
+        id: r.id,
+        name: r.name,
+        url: r.url,
+        events: typeof r.events === 'string' ? JSON.parse(r.events) : r.events,
+        createdAt: r.created_at
+      }));
+    } catch (err) {
+      console.error("Postgres getWebhooks failed:", err.message);
+      return [];
+    }
+  }
+
+  if (useLocalDb) {
+    const data = readLocalJson();
+    return data.webhooks || [];
+  }
+
+  if (firestoreInstance) {
+    try {
+      const snapshot = await firestoreInstance.collection('webhooks').orderBy('createdAt', 'desc').get();
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (err) {
+      console.error("Firestore getWebhooks failed:", err.message);
+      return [];
+    }
+  }
+
+  return [];
+}
+
+export async function saveWebhook(webhook) {
+  const id = webhook.id || `wh-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+  const wh = {
+    id,
+    name: webhook.name || 'Webhook Link',
+    url: webhook.url,
+    events: webhook.events || [],
+    createdAt: webhook.createdAt || new Date().toISOString()
+  };
+
+  if (usePostgres && pgPool) {
+    try {
+      await pgPool.query(
+        `INSERT INTO webhooks (id, name, url, events) 
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (id) DO UPDATE SET 
+           name = EXCLUDED.name, url = EXCLUDED.url, events = EXCLUDED.events`,
+        [wh.id, wh.name, wh.url, JSON.stringify(wh.events)]
+      );
+    } catch (err) {
+      console.error("Postgres saveWebhook failed:", err.message);
+      throw err;
+    }
+    return wh;
+  }
+
+  if (useLocalDb) {
+    const data = readLocalJson();
+    if (!data.webhooks) data.webhooks = [];
+    const idx = data.webhooks.findIndex(w => w.id === wh.id);
+    if (idx !== -1) {
+      data.webhooks[idx] = wh;
+    } else {
+      data.webhooks.push(wh);
+    }
+    writeLocalJson(data);
+    return wh;
+  }
+
+  if (firestoreInstance) {
+    try {
+      await firestoreInstance.collection('webhooks').doc(wh.id).set(wh, { merge: true });
+    } catch (err) {
+      console.error("Firestore saveWebhook failed:", err.message);
+      throw err;
+    }
+    return wh;
+  }
+
+  return wh;
+}
+
+export async function deleteWebhook(id) {
+  if (usePostgres && pgPool) {
+    try {
+      await pgPool.query('DELETE FROM webhooks WHERE id = $1', [id]);
+    } catch (err) {
+      console.error("Postgres deleteWebhook failed:", err.message);
+      throw err;
+    }
+    return { success: true };
+  }
+
+  if (useLocalDb) {
+    const data = readLocalJson();
+    if (data.webhooks) {
+      data.webhooks = data.webhooks.filter(w => w.id !== id);
+      writeLocalJson(data);
+    }
+    return { success: true };
+  }
+
+  if (firestoreInstance) {
+    try {
+      await firestoreInstance.collection('webhooks').doc(id).delete();
+    } catch (err) {
+      console.error("Firestore deleteWebhook failed:", err.message);
+      throw err;
+    }
+    return { success: true };
+  }
+
+  return { success: true };
+}
+

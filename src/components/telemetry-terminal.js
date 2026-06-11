@@ -17,11 +17,13 @@ export function initTelemetryTerminal() {
   const tabHistoryBtn = document.getElementById('tab-history-btn');
   const tabChartsBtn = document.getElementById('tab-charts-btn');
   const tabRcaBtn = document.getElementById('tab-rca-btn');
+  const tabIntegrationsBtn = document.getElementById('tab-integrations-btn');
   
   const terminalScreen = document.getElementById('terminal-screen-container');
   const historyContainer = document.getElementById('maneuver-history-container');
   const chartsContainer = document.getElementById('subsystem-charts-container');
   const rcaContainer = document.getElementById('subsystem-rca-container');
+  const integrationsContainer = document.getElementById('integration-manager-container');
   const inputRow = document.getElementById('terminal-input-row-container');
 
   let activeTab = 'terminal';
@@ -32,10 +34,12 @@ export function initTelemetryTerminal() {
       if (tabHistoryBtn) tabHistoryBtn.style.opacity = '0.5';
       if (tabChartsBtn) tabChartsBtn.style.opacity = '0.5';
       if (tabRcaBtn) tabRcaBtn.style.opacity = '0.5';
+      if (tabIntegrationsBtn) tabIntegrationsBtn.style.opacity = '0.5';
       if (terminalScreen) terminalScreen.style.display = 'block';
       if (historyContainer) historyContainer.style.display = 'none';
       if (chartsContainer) chartsContainer.style.display = 'none';
       if (rcaContainer) rcaContainer.style.display = 'none';
+      if (integrationsContainer) integrationsContainer.style.display = 'none';
       if (inputRow) inputRow.style.display = 'flex';
       if (terminalScreen) terminalScreen.scrollTop = terminalScreen.scrollHeight;
     } else if (activeTab === 'history') {
@@ -43,10 +47,12 @@ export function initTelemetryTerminal() {
       if (tabHistoryBtn) tabHistoryBtn.style.opacity = '1';
       if (tabChartsBtn) tabChartsBtn.style.opacity = '0.5';
       if (tabRcaBtn) tabRcaBtn.style.opacity = '0.5';
+      if (tabIntegrationsBtn) tabIntegrationsBtn.style.opacity = '0.5';
       if (terminalScreen) terminalScreen.style.display = 'none';
       if (historyContainer) historyContainer.style.display = 'block';
       if (chartsContainer) chartsContainer.style.display = 'none';
       if (rcaContainer) rcaContainer.style.display = 'none';
+      if (integrationsContainer) integrationsContainer.style.display = 'none';
       if (inputRow) inputRow.style.display = 'none';
       renderManeuverHistory();
     } else if (activeTab === 'charts') {
@@ -54,10 +60,12 @@ export function initTelemetryTerminal() {
       if (tabHistoryBtn) tabHistoryBtn.style.opacity = '0.5';
       if (tabChartsBtn) tabChartsBtn.style.opacity = '1';
       if (tabRcaBtn) tabRcaBtn.style.opacity = '0.5';
+      if (tabIntegrationsBtn) tabIntegrationsBtn.style.opacity = '0.5';
       if (terminalScreen) terminalScreen.style.display = 'none';
       if (historyContainer) historyContainer.style.display = 'none';
       if (chartsContainer) chartsContainer.style.display = 'flex';
       if (rcaContainer) rcaContainer.style.display = 'none';
+      if (integrationsContainer) integrationsContainer.style.display = 'none';
       if (inputRow) inputRow.style.display = 'none';
       
       // Dispatch custom event to let the charting module know the tab is active
@@ -67,14 +75,31 @@ export function initTelemetryTerminal() {
       if (tabHistoryBtn) tabHistoryBtn.style.opacity = '0.5';
       if (tabChartsBtn) tabChartsBtn.style.opacity = '0.5';
       if (tabRcaBtn) tabRcaBtn.style.opacity = '1';
+      if (tabIntegrationsBtn) tabIntegrationsBtn.style.opacity = '0.5';
       if (terminalScreen) terminalScreen.style.display = 'none';
       if (historyContainer) historyContainer.style.display = 'none';
       if (chartsContainer) chartsContainer.style.display = 'none';
       if (rcaContainer) rcaContainer.style.display = 'flex';
+      if (integrationsContainer) integrationsContainer.style.display = 'none';
       if (inputRow) inputRow.style.display = 'none';
       
       // Dispatch custom event to let the RCA analyzer know the tab is active
       document.dispatchEvent(new CustomEvent('subsystem-rca-activated'));
+    } else if (activeTab === 'integrations') {
+      if (tabTerminalBtn) tabTerminalBtn.style.opacity = '0.5';
+      if (tabHistoryBtn) tabHistoryBtn.style.opacity = '0.5';
+      if (tabChartsBtn) tabChartsBtn.style.opacity = '0.5';
+      if (tabRcaBtn) tabRcaBtn.style.opacity = '0.5';
+      if (tabIntegrationsBtn) tabIntegrationsBtn.style.opacity = '1';
+      if (terminalScreen) terminalScreen.style.display = 'none';
+      if (historyContainer) historyContainer.style.display = 'none';
+      if (chartsContainer) chartsContainer.style.display = 'none';
+      if (rcaContainer) rcaContainer.style.display = 'none';
+      if (integrationsContainer) integrationsContainer.style.display = 'flex';
+      if (inputRow) inputRow.style.display = 'none';
+      
+      // Dispatch custom event to let the integrations module know the tab is active
+      document.dispatchEvent(new CustomEvent('integrations-activated'));
     }
   };
 
@@ -106,6 +131,14 @@ export function initTelemetryTerminal() {
     tabRcaBtn.addEventListener('click', () => {
       audio.playClick();
       activeTab = 'rca';
+      updateTabViews();
+    });
+  }
+
+  if (tabIntegrationsBtn) {
+    tabIntegrationsBtn.addEventListener('click', () => {
+      audio.playClick();
+      activeTab = 'integrations';
       updateTabViews();
     });
   }
