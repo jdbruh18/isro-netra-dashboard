@@ -127,7 +127,7 @@ Migrate the prototype to a secure serverless cloud environment.
    ```bash
    gcloud builds submit --config=cloudbuild.yaml --substitutions=PROJECT_ID=YOUR_PROJECT_ID
    ```
-4. Read the detailed [DEPLOY_GCP.md](file:///C:/Users/MSI/.gemini/antigravity/scratch/space-intelligence-dashboard/DEPLOY_GCP.md) for IAM permissions mappings.
+4. Read the detailed [DEPLOY_GCP.md](file:///D:/space-intelligence-dashboard/DEPLOY_GCP.md) for IAM permissions mappings.
 
 ### Phase 4: Autonomous Multi-Agent Systems
 Write external python script listeners to interact with the WebSocket server gateway.
@@ -136,3 +136,46 @@ Write external python script listeners to interact with the WebSocket server gat
   ```json
   { "action": "MANEUVER_ORBIT", "satelliteId": "gaganyaan", "deltaV": 1.45, "direction": "PROGRADE" }
   ```
+
+---
+
+## Model Context Protocol (MCP) Server Integration
+
+The Space Intelligence Dashboard includes a built-in stdio-based **Model Context Protocol (MCP)** server. This allows external LLMs and AI clients (like Claude Desktop, Cursor, or peer agents) to directly interact with our spacecraft digital twins, run causality-based diagnostics, and execute safety-checked orbital evasion maneuvers.
+
+### Exposed Tools
+
+1. `get_space_assets`: Exposes tracked spacecraft and debris with coordinates, threat levels, and digital twin subsystem states.
+2. `get_space_weather`: Exposes solar wind, proton flux, and Kp index.
+3. `get_anomaly_diagnostics`: Exposes active anomalies and time-to-failure countdowns.
+4. `get_root_cause_analysis`: Traverses directed causality trees to diagnose subsystem failures.
+5. `consult_solar_physics_analyst`: Evaluates space weather parameters for safety clearance.
+6. `validate_subsystem_state`: Runs type-level safety validations of battery SoC, fuel level, and ADCS.
+7. `calculate_avoidance_vector`: Computes evasion burn magnitudes and directions.
+8. `execute_orbital_burn`: Performs thrust maneuvers (validating bounds via Idris 2 type-safety).
+
+### Configuring Claude Desktop
+
+Add the following configuration to your Claude Desktop config file (located at `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+
+```json
+{
+  "mcpServers": {
+    "isro-netra-mcp": {
+      "command": "node",
+      "args": [
+        "D:/space-intelligence-dashboard/mcp-server.js"
+      ]
+    }
+  }
+}
+```
+
+### Configuring Cursor IDE
+
+1. Go to **Settings** -> **Features** -> **MCP**.
+2. Click **+ Add New MCP Server**.
+3. Name: `isro-netra-mcp`
+4. Type: `stdio`
+5. Command: `node D:/space-intelligence-dashboard/mcp-server.js`
+

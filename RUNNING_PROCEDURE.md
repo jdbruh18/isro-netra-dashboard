@@ -139,3 +139,23 @@ You can manually query or modify the space asset catalog from any command line t
   ```bash
   curl "http://localhost:8080/api/telemetry"
   ```
+
+---
+
+## 8. Running the Model Context Protocol (MCP) Server
+
+You can run the Space Intelligence Dashboard as an MCP Server directly via stdio. This enables any MCP client (such as Claude Desktop or Cursor) to call spacecraft tools:
+
+1. **Verify local database file exists**:
+   Ensure `db-local.json` exists in the root (it is generated automatically on the first startup of either the main server or the MCP server).
+2. **Execute the MCP server via npm**:
+   ```bash
+   npm run mcp
+   ```
+3. **Debug stdio connection**:
+   Since the server uses standard I/O for MCP JSON-RPC packets, all operational logs, debugging statements, and errors are printed exclusively to `stderr` (`console.error`). Stderr outputs will show:
+   ```text
+   [MCP-INFO] ISRO NETRA Space Domain Awareness MCP Server active.
+   ```
+   If you configure the server inside Claude Desktop, you can review Claude's logs to inspect any incoming tool calls and responses.
+
